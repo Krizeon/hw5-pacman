@@ -6,7 +6,9 @@ globals[
   start-patch
   player
   max-speed
-
+  frame
+  time-frame
+  framerate ;determines the framerate of the game (default 30 fps)
 ]
 
 patches-own [
@@ -25,8 +27,6 @@ ghosts-own [ ]
 to setup
   ca
   setup-patches
-
-
   create-turtles 1 [
     set size 3
     setxy 0 -15
@@ -57,33 +57,13 @@ to setup
     set color blue
     set heading 0
   ]
-
+  reset-ticks
+  reset-timer
+  set frame 0
+  set time-frame 0
+  set framerate 15
   setup-pellets
 end
-
-; The maze is imported from a picture.
-to setup-patches
-  import-pcolors "pacman-maze.png"
-  ask patches [
-    ifelse pcolor = 104.7 [
-      set player-wall? false
-      set wall? true
-    ][
-      ifelse pcolor = 17.5[
-        set player-wall? true
-      ][
-        set player-wall? false
-        set wall? false
-      ]
-    ]
-  ]
-
-  ;
-  ask patch -1 7 [ set player-wall? true ]
-  ask patch  0 7 [ set player-wall? true ]
-  ask patch  1 7 [ set player-wall? true ]
-end
-
 
 to setup-pellets
 
@@ -121,6 +101,100 @@ to setup-pellets
 
 end
 
+; The maze is imported from a picture.
+to setup-patches
+  import-pcolors "pacman-maze.png"
+  ask patches [
+    ifelse pcolor = 104.7 [
+      set player-wall? false
+      set wall? true
+    ][
+      ifelse pcolor = 17.5[
+        set player-wall? true
+      ][
+        set player-wall? false
+        set wall? false
+      ]
+    ]
+  ]
+    ;
+  ask patch -1 7 [ set player-wall? true ]
+  ask patch  0 7 [ set player-wall? true ]
+  ask patch  1 7 [ set player-wall? true ]
+end
+
+
+to move
+  set time-frame round (timer * framerate)
+  if frame < time-frame + 1[
+    show frame
+    ask player [
+      if [wall?] of patch-ahead 2 = false  and [player-wall?] of patch-ahead 3 = false[
+        fd 1
+        animate-pacman
+      ]
+    ]
+    set frame frame + 1
+  ]
+  collisions
+
+end
+
+
+to collisions
+  ask turtles with [pellet? = true] [
+   if distance player <= 1 [
+     die
+    ]
+  ]
+end
+
+
+to turn-up
+  ask patch ([xcor] of player) (([ycor] of player) + 1) [
+    ifelse any? neighbors with [wall? = true] [
+    ] [
+      ask player [ set heading 0 ]
+    ]
+  ]
+end
+
+to turn-right
+  ask patch (([xcor] of player) + 1) ([ycor] of player) [
+    ifelse any? neighbors with [wall? = true] [
+    ] [
+      ask player [ set heading 90 ]
+    ]
+  ]
+end
+
+to turn-down
+  ask patch ([xcor] of player) (([ycor] of player) - 1) [
+    ifelse any? neighbors with [wall? = true] [
+    ] [
+      ask player [ set heading 180 ]
+    ]
+  ]
+end
+
+to turn-left
+  ask patch (([xcor] of player) - 1) ([ycor] of player) [
+    ifelse any? neighbors with [wall? = true] [
+    ] [
+      ask player [ set heading 270 ]
+    ]
+  ]
+end
+
+
+;animate Pac-man so that his mouth opens every other frame
+to animate-pacman
+  ask player[
+    if time-frame mod 2 = 0 [set shape "pacman"]
+    if time-frame mod 2 = 1 [set shape "circle"]
+  ]
+end
+
 to kill-extra-pellets
   ask turtles with [ (ycor = 9)  and (xcor < -19) ] [ die ]
   ask turtles with [ (ycor = 9)  and (xcor >  19) ] [ die ]
@@ -136,65 +210,12 @@ to set-big-pellets
   ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 set color 46.5 ]
 end
 
-to move
-  ask player [
-    if [wall?] of patch-ahead 2 = false and [player-wall?] of patch-ahead 3 = false [
-    fd 1
-    ]
-  ]
-
-  collisions
-end
 
 
-to collisions
-  ask turtles with [pellet? = true] [
-   if distance player <= 1 [
-     die
-    ]
-  ]
-end
 
-to turn-up
-  ; the paths the player can take are 3 by 3 patches. To only allow the player to move in the center down each path,
-  ; the program checks if the immediate patch in the direction the player wants to take (in the case the patch immediately above)
-  ; has only neighbors that are not walls. That way, corners are not cut and it makes sure the player moves down the center of the path.
 
-  ask patch ([xcor] of player) (([ycor] of player) + 1) [
-    ifelse any? neighbors with [wall? = true] [
-    ] [
-      ask player [ set heading 0 ]
-    ]
-  ]
 
-end
 
-to turn-right
-  ask patch (([xcor] of player) + 1) ([ycor] of player) [
-    ifelse any? neighbors with [wall? = true] [
-    ] [
-      ask player [ set heading 90 ]
-    ]
-  ]
-end
-
-to turn-down
-  ask patch ([xcor] of player) (([ycor] of player) - 1) [
-    ifelse any? neighbors with [(wall? = true) or (player-wall? = true)] [
-    ] [
-      ask player [ set heading 180 ]
-    ]
-  ]
-end
-
-to turn-left
-  ask patch (([xcor] of player) - 1) ([ycor] of player) [
-    ifelse any? neighbors with [wall? = true] [
-    ] [
-      ask player [ set heading 270 ]
-    ]
-  ]
-end
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
@@ -217,8 +238,8 @@ GRAPHICS-WINDOW
 28
 -31
 31
-0
-0
+1
+1
 1
 ticks
 30.0
@@ -263,8 +284,8 @@ BUTTON
 140
 214
 up
-turn-up\nif [heading] of player = 0 [\nstop\n]
-T
+turn-up
+NIL
 1
 T
 OBSERVER
@@ -280,8 +301,8 @@ BUTTON
 142
 267
 down
-turn-down\nif [heading] of player = 180 [\nstop\n]
-T
+turn-down
+NIL
 1
 T
 OBSERVER
@@ -297,8 +318,8 @@ BUTTON
 72
 268
 left
-turn-left\nif [heading] of player = 270 [\nstop\n]
-T
+turn-left
+NIL
 1
 T
 OBSERVER
@@ -314,8 +335,8 @@ BUTTON
 212
 267
 right
-turn-right\nif [heading] of player = 90 [\nstop\n]
-T
+turn-right
+NIL
 1
 T
 OBSERVER
@@ -528,6 +549,17 @@ true
 0
 Line -7500403 true 150 0 150 150
 
+moon
+false
+0
+Polygon -7500403 true true 175 7 83 36 25 108 27 186 79 250 134 271 205 274 281 239 207 233 152 216 113 185 104 132 110 77 132 51
+
+pacman
+true
+0
+Circle -7500403 true true 0 0 300
+Polygon -16777216 true false 45 45 150 150 240 30 195 0 105 0 45 30 45 45
+
 pentagon
 false
 0
@@ -585,6 +617,26 @@ star
 false
 0
 Polygon -7500403 true true 151 1 185 108 298 108 207 175 242 282 151 216 59 282 94 175 3 108 116 108
+
+strawberry
+false
+0
+Polygon -7500403 false true 149 47 103 36 72 45 58 62 37 88 35 114 34 141 84 243 122 290 151 280 162 288 194 287 239 227 284 122 267 64 224 45 194 38
+Polygon -7500403 true true 72 47 38 88 34 139 85 245 122 289 150 281 164 288 194 288 239 228 284 123 267 65 225 46 193 39 149 48 104 38
+Polygon -10899396 true false 136 62 91 62 136 77 136 92 151 122 166 107 166 77 196 92 241 92 226 77 196 62 226 62 241 47 166 57 136 32
+Polygon -16777216 false false 135 62 90 62 135 75 135 90 150 120 166 107 165 75 196 92 240 92 225 75 195 61 226 62 239 47 165 56 135 30
+Line -16777216 false 105 120 90 135
+Line -16777216 false 75 120 90 135
+Line -16777216 false 75 150 60 165
+Line -16777216 false 45 150 60 165
+Line -16777216 false 90 180 105 195
+Line -16777216 false 120 180 105 195
+Line -16777216 false 120 225 105 240
+Line -16777216 false 90 225 105 240
+Line -16777216 false 120 255 135 270
+Line -16777216 false 120 135 135 150
+Line -16777216 false 135 210 150 225
+Line -16777216 false 165 180 180 195
 
 target
 false
@@ -667,7 +719,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.1
+NetLogo 6.0.2
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
