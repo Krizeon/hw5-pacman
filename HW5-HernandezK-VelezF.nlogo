@@ -1,6 +1,7 @@
 ; Felix Velez and Kevin Hernandez
 ; HW6
-; Pac-Man
+; Pac-Man!!
+;ayy
 
 globals[
   start-patch
