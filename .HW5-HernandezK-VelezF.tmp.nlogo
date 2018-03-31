@@ -21,12 +21,19 @@ patches-own [
   wall?
 ; Player can't enter small box in the center. Only the ghosts can.
   player-wall?
+  intersection?
 ]
 
 breed [ ghosts ghost ]
-breed [ pellets pellet ]
 
-turtles-own [ speed pellet? ]
+turtles-own [
+  speed
+  pellet?
+  want-up?
+  want-down?
+  want-left?
+  want-right?
+]
 
 ghosts-own [ ]
 
@@ -36,11 +43,12 @@ to setup
   create-turtles 1 [
     set size 3
     setxy 0 -15
-    set heading 270
+    set heading 0
     set color yellow
     set speed 0.0001
     set player self
-    set shape "circle"
+    set shape "pacman"
+    turn-setup
   ]
 
   create-ghosts 1 [
@@ -50,6 +58,7 @@ to setup
     set heading 0
     set shape "ghost"
     set blinky self
+    turn-setup
   ]
 
   create-ghosts 1 [
@@ -59,6 +68,7 @@ to setup
     set heading 0
     set shape "ghost"
     set pinky self
+    turn-setup
   ]
 
   create-ghosts 1 [
@@ -68,12 +78,13 @@ to setup
     set heading 0
     set shape "ghost"
     set inky self
+    turn-setup
   ]
   reset-ticks
   reset-timer
   set frame 0
   set time-frame 0
-  set framerate 15
+  set framerate 20
   setup-pellets
 end
 
@@ -88,7 +99,7 @@ to setup-pellets
   ;    4) X and y must be evenly divided by 3 (also to be centered)
   repeat 196[
 
-    let good-loc (   one-of patches
+    let good-loc ( one-of patches
       ;1
       with [ (wall? = false)
         ;2
@@ -96,9 +107,11 @@ to setup-pellets
         ;3
         and (not any? turtles-here)]
       ;4
-      with [ (pxcor mod 3 = 0) and (pycor mod 3 = 0) ]    )
+      with [ (pxcor mod 3 = 0) and (pycor mod 3 = 0) ]
+    )
 
-    create-pellets 1 [
+    create-turtles 1 [
+      set size .5
       set pellet? true
       set shape "circle"
       set color white
@@ -128,10 +141,18 @@ to setup-patches
       ]
     ]
   ]
+  ask patches with [wall? = false  and (pxcor mod 3 = 0) and (pycor mod 3 = 0)][
+    if count (patches in-radius 3 with [wall? = true]) = 4[
+      set pcolor green
+      set intersection? true
+    ]
+  ]
+
     ;
   ask patch -1 7 [ set player-wall? true ]
   ask patch  0 7 [ set player-wall? true ]
   ask patch  1 7 [ set player-wall? true ]
+
 end
 
 
@@ -140,6 +161,38 @@ to move
   if frame < time-frame + 1[
     show frame
     ask player [
+      if want-up? [
+        ask patch ([xcor] of player) (([ycor] of player) + 1) [
+          ifelse any? neighbors with [wall? = true] [
+          ] [
+            ask player [set heading 0]
+          ]
+        ]
+      ]
+      if want-down? [
+        ask patch ([xcor] of player) (([ycor] of player) - 1) [
+          ifelse any? neighbors with [wall? = true] [
+          ] [
+            ask player [set heading 180]
+          ]
+        ]
+      ]
+      if want-right? [
+        ask patch (([xcor] of player) + 1) ([ycor] of player) [
+          ifelse any? neighbors with [wall? = true] [
+          ] [
+            ask player [set heading 90]
+          ]
+        ]
+      ]
+      if want-left? [
+        ask patch (([xcor] of player) - 1) ([ycor] of player) [
+          ifelse any? neighbors with [wall? = true] [
+          ] [
+            ask player [set heading 270]
+          ]
+        ]
+      ]
       if [wall?] of patch-ahead 2 = false  and [player-wall?] of patch-ahead 3 = false[
         fd .75
         animate-pacman
@@ -155,11 +208,11 @@ end
 
 to enemy-movement
   ask pinky[
-    if [wall?] of patch-ahead 2 = false[
+    if [intersection?] of patch-here = true[face one-of neighbors4 with [wall? = false]]
+    ifelse [wall?] of patch-ahead 2 = false[
       fd .75
     ][
       face one-of neighbors4 with [wall? = false]
-
     ]
   ]
 
@@ -167,7 +220,7 @@ end
 
 
 to collisions
-  ask pellets [
+  ask turtles with [pellet? = true] [
    if distance player <= 1 [
      die
     ]
@@ -176,45 +229,44 @@ end
 
 ; player turns up
 to turn-up
-  ask patch ([xcor] of player) (([ycor] of player) + 1) [
-    ifelse any? neighbors with [wall? = true] [
-    ] [
-      ask player [ set heading 0 ]
-    ]
-  ]
+  set want-up? true
+  set want-down? false
+  set want-left? false
+  set want-right? false
 end
 
 
 ;player turns right
 to turn-right
-  ask patch (([xcor] of player) + 1) ([ycor] of player) [
-    ifelse any? neighbors with [wall? = true] [
-    ] [
-      ask player [ set heading 90 ]
-    ]
-  ]
+  set want-up? false
+  set want-down? false
+  set want-left? false
+  set want-right? true
 end
 
 
 ;player turns dowwn
 to turn-down
-  ask patch ([xcor] of player) (([ycor] of player) - 1) [
-    ifelse any? neighbors with [wall? = true] [
-    ] [
-      ask player [ set heading 180 ]
-    ]
-  ]
+  set want-up? false
+  set want-down? true
+  set want-left? false
+  set want-right? false
 end
 
 
 ;player turns left
 to turn-left
-  ask patch (([xcor] of player) - 1) ([ycor] of player) [
-    ifelse any? neighbors with [wall? = true] [
-    ] [
-      ask player [ set heading 270 ]
-    ]
-  ]
+  set want-up? false
+  set want-down? false
+  set want-left? true
+  set want-right? false
+end
+
+to turn-setup
+  set want-up? false
+  set want-down? false
+  set want-left? false
+  set want-right? false
 end
 
 
@@ -235,20 +287,11 @@ to kill-extra-pellets
 end
 
 to set-big-pellets
-  ask turtles with [ (ycor =  27)  and (xcor = -24) ] [ set size 2 set color 46.5 ]
-  ask turtles with [ (ycor = -27)  and (xcor = -24) ] [ set size 2 set color 46.5 ]
-  ask turtles with [ (ycor = -27)  and (xcor =  24) ] [ set size 2 set color 46.5 ]
-  ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 set color 46.5 ]
+  ask turtles with [ (ycor =  27)  and (xcor = -24) ] [ set size 2 ]
+  ask turtles with [ (ycor = -27)  and (xcor = -24) ] [ set size 2 ]
+  ask turtles with [ (ycor = -27)  and (xcor =  24) ] [ set size 2 ]
+  ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 ]
 end
-
-
-
-
-
-
-
-
-
 
 
 
@@ -264,7 +307,7 @@ GRAPHICS-WINDOW
 -1
 8.0
 1
-10
+12
 1
 1
 1
@@ -322,7 +365,7 @@ BUTTON
 140
 214
 up
-turn-up
+ask player [turn-up]
 NIL
 1
 T
@@ -339,7 +382,7 @@ BUTTON
 142
 267
 down
-turn-down
+ask player [turn-down]
 NIL
 1
 T
@@ -356,7 +399,7 @@ BUTTON
 72
 268
 left
-turn-left
+ask player [turn-left]
 NIL
 1
 T
@@ -373,7 +416,7 @@ BUTTON
 212
 267
 right
-turn-right
+ask player [turn-right]
 NIL
 1
 T
@@ -564,7 +607,7 @@ Polygon -10899396 true false 189 233 219 188 249 173 279 188 234 218
 Polygon -10899396 true false 180 255 150 210 105 210 75 240 135 240
 
 ghost
-true
+false
 0
 Rectangle -7500403 true true 60 120 240 225
 Circle -7500403 true true 63 33 175
