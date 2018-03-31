@@ -20,6 +20,7 @@ patches-own [
 ]
 
 breed [ ghosts ghost ]
+breed [ pellets pellet ]
 
 turtles-own [ speed pellet? ]
 
@@ -87,7 +88,7 @@ to setup-pellets
       ;4
       with [ (pxcor mod 3 = 0) and (pycor mod 3 = 0) ]    )
 
-    create-turtles 1 [
+    create-pellets 1 [
       set pellet? true
       set shape "circle"
       set color white
@@ -143,7 +144,7 @@ end
 
 
 to collisions
-  ask turtles with [pellet? = true] [
+  ask pellets [
    if distance player <= 1 [
      die
     ]
@@ -210,6 +211,7 @@ to set-big-pellets
   ask turtles with [ (ycor = -27)  and (xcor =  24) ] [ set size 2 set color 46.5 ]
   ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 set color 46.5 ]
 end
+
 
 
 
@@ -718,7 +720,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.2
+NetLogo 6.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
