@@ -141,7 +141,7 @@ to move
     show frame
     ask player [
       if [wall?] of patch-ahead 2 = false  and [player-wall?] of patch-ahead 3 = false[
-        fd
+        fd .75
         animate-pacman
       ]
     ]
@@ -155,11 +155,11 @@ end
 
 to enemy-movement
   ask pinky[
-    ifelse [wall?] of patch-ahead 2 = false[
-      fd 1
+    if [wall?] of patch-ahead 2 = false[
+      fd .75
     ][
       face one-of neighbors4 with [wall? = false]
-      fd 1
+
     ]
   ]
 

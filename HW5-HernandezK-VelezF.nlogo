@@ -1,7 +1,6 @@
 ; Felix Velez and Kevin Hernandez
 ; HW6
-; Pac-Man!!
-;ayy
+; Pac-Man
 
 globals[
   start-patch
@@ -10,6 +9,11 @@ globals[
   frame
   time-frame
   framerate ;determines the framerate of the game (default 30 fps)
+  ;ghost names
+  inky   ;blue ghost
+  blinky ;red ghost
+  pinky  ;pink ghost
+  clyde  ;orange ghost
 ]
 
 patches-own [
@@ -40,24 +44,30 @@ to setup
   ]
 
   create-ghosts 1 [
-    set size 3
+    set size 4
     setxy -3 3
     set color red
     set heading 0
+    set shape "ghost"
+    set blinky self
   ]
 
   create-ghosts 1 [
-    set size 3
-    setxy 0 3
+    set size 4
+    setxy 0 9
     set color pink
     set heading 0
+    set shape "ghost"
+    set pinky self
   ]
 
   create-ghosts 1 [
-    set size 3
+    set size 4
     setxy 3 3
-    set color blue
+    set color blue + 1
     set heading 0
+    set shape "ghost"
+    set inky self
   ]
   reset-ticks
   reset-timer
@@ -99,9 +109,8 @@ to setup-pellets
   ; this kills the ones created in those areas.
   kill-extra-pellets
   set-big-pellets
-
-
 end
+
 
 ; The maze is imported from a picture.
 to setup-patches
@@ -132,13 +141,26 @@ to move
     show frame
     ask player [
       if [wall?] of patch-ahead 2 = false  and [player-wall?] of patch-ahead 3 = false[
-        fd 1
+        fd .75
         animate-pacman
       ]
     ]
+    enemy-movement
     set frame frame + 1
   ]
   collisions
+
+end
+
+
+to enemy-movement
+  ask pinky[
+    ifelse [wall?] of patch-ahead 2 = false[
+      fd .75
+    ][
+      face one-of neighbors4 with [wall? = false]
+    ]
+  ]
 
 end
 
@@ -151,7 +173,7 @@ to collisions
   ]
 end
 
-
+; player turns up
 to turn-up
   ask patch ([xcor] of player) (([ycor] of player) + 1) [
     ifelse any? neighbors with [wall? = true] [
@@ -161,6 +183,8 @@ to turn-up
   ]
 end
 
+
+;player turns right
 to turn-right
   ask patch (([xcor] of player) + 1) ([ycor] of player) [
     ifelse any? neighbors with [wall? = true] [
@@ -170,6 +194,8 @@ to turn-right
   ]
 end
 
+
+;player turns dowwn
 to turn-down
   ask patch ([xcor] of player) (([ycor] of player) - 1) [
     ifelse any? neighbors with [wall? = true] [
@@ -179,6 +205,8 @@ to turn-down
   ]
 end
 
+
+;player turns left
 to turn-left
   ask patch (([xcor] of player) - 1) ([ycor] of player) [
     ifelse any? neighbors with [wall? = true] [
@@ -211,6 +239,14 @@ to set-big-pellets
   ask turtles with [ (ycor = -27)  and (xcor =  24) ] [ set size 2 set color 46.5 ]
   ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 set color 46.5 ]
 end
+
+
+
+
+
+
+
+
 
 
 
@@ -526,6 +562,18 @@ Circle -16777216 true false 113 68 74
 Polygon -10899396 true false 189 233 219 188 249 173 279 188 234 218
 Polygon -10899396 true false 180 255 150 210 105 210 75 240 135 240
 
+ghost
+true
+0
+Rectangle -7500403 true true 60 120 240 225
+Circle -7500403 true true 63 33 175
+Rectangle -16777216 true false 120 225 210 225
+Circle -1 true false 86 86 67
+Circle -1 true false 161 86 67
+Circle -13345367 true false 193 118 32
+Circle -13345367 true false 118 118 32
+Polygon -7500403 true true 60 210 60 255 90 225 120 255 150 225 180 255 210 225 240 255 240 210 60 210
+
 house
 false
 0
@@ -720,7 +768,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.1
+NetLogo 6.0.2
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
