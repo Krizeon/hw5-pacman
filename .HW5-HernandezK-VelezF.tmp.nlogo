@@ -14,10 +14,6 @@ globals[
   blinky ;red ghost
   pinky  ;pink ghost
   clyde  ;orange ghost
-  want-up?
-  want-down?
-  want-left?
-  want-right?
 ]
 
 patches-own [
@@ -28,6 +24,7 @@ patches-own [
 ]
 
 breed [ ghosts ghost ]
+breed [ pellets pellet ]
 
 turtles-own [ speed pellet? ]
 
@@ -35,21 +32,15 @@ ghosts-own [ ]
 
 to setup
   ca
-
-  set want-up? false
-  set want-down? false
-  set want-left? false
-  set want-right? false
-
   setup-patches
   create-turtles 1 [
     set size 3
     setxy 0 -15
-    set heading 0
+    set heading 270
     set color yellow
     set speed 0.0001
     set player self
-    set shape "pacman"
+    set shape "circle"
   ]
 
   create-ghosts 1 [
@@ -107,7 +98,7 @@ to setup-pellets
       ;4
       with [ (pxcor mod 3 = 0) and (pycor mod 3 = 0) ]    )
 
-    create-turtles 1 [
+    create-pellets 1 [
       set pellet? true
       set shape "circle"
       set color white
@@ -149,47 +140,6 @@ to move
   if frame < time-frame + 1[
     show frame
     ask player [
-
-      if want-up? [
-        ask patch ([xcor] of player) (([ycor] of player) + 1) [
-          ifelse any? neighbors with [wall? = true] [
-          ] [
-            ask player [set heading 0]
-          ]
-        ]
-      ]
-
-
-      if want-down? [
-        ask patch ([xcor] of player) (([ycor] of player) - 1) [
-          ifelse any? neighbors with [wall? = true] [
-          ] [
-            ask player [set heading 180]
-          ]
-        ]
-      ]
-
-
-      if want-right? [
-        ask patch (([xcor] of player) + 1) ([ycor] of player) [
-          ifelse any? neighbors with [wall? = true] [
-          ] [
-            ask player [set heading 90]
-          ]
-        ]
-      ]
-
-
-      if want-left? [
-        ask patch (([xcor] of player) - 1) ([ycor] of player) [
-          ifelse any? neighbors with [wall? = true] [
-          ] [
-            ask player [set heading 270]
-          ]
-        ]
-      ]
-
-
       if [wall?] of patch-ahead 2 = false  and [player-wall?] of patch-ahead 3 = false[
         fd .75
         animate-pacman
@@ -205,10 +155,11 @@ end
 
 to enemy-movement
   ask pinky[
-    ifelse [wall?] of patch-ahead 2 = false[
+    if [wall?] of patch-ahead 2 = false[
       fd .75
     ][
       face one-of neighbors4 with [wall? = false]
+
     ]
   ]
 
@@ -216,7 +167,7 @@ end
 
 
 to collisions
-  ask turtles with [pellet? = true] [
+  ask pellets [
    if distance player <= 1 [
      die
     ]
@@ -225,37 +176,45 @@ end
 
 ; player turns up
 to turn-up
-  set want-up? true
-  set want-down? false
-  set want-left? false
-  set want-right? false
+  ask patch ([xcor] of player) (([ycor] of player) + 1) [
+    ifelse any? neighbors with [wall? = true] [
+    ] [
+      ask player [ set heading 0 ]
+    ]
+  ]
 end
 
 
 ;player turns right
 to turn-right
-  set want-up? false
-  set want-down? false
-  set want-left? false
-  set want-right? true
+  ask patch (([xcor] of player) + 1) ([ycor] of player) [
+    ifelse any? neighbors with [wall? = true] [
+    ] [
+      ask player [ set heading 90 ]
+    ]
+  ]
 end
 
 
 ;player turns dowwn
 to turn-down
-  set want-up? false
-  set want-down? true
-  set want-left? false
-  set want-right? false
+  ask patch ([xcor] of player) (([ycor] of player) - 1) [
+    ifelse any? neighbors with [wall? = true] [
+    ] [
+      ask player [ set heading 180 ]
+    ]
+  ]
 end
 
 
 ;player turns left
 to turn-left
-  set want-up? false
-  set want-down? false
-  set want-left? true
-  set want-right? false
+  ask patch (([xcor] of player) - 1) ([ycor] of player) [
+    ifelse any? neighbors with [wall? = true] [
+    ] [
+      ask player [ set heading 270 ]
+    ]
+  ]
 end
 
 
@@ -276,11 +235,19 @@ to kill-extra-pellets
 end
 
 to set-big-pellets
-  ask turtles with [ (ycor =  27)  and (xcor = -24) ] [ set size 2 ]
-  ask turtles with [ (ycor = -27)  and (xcor = -24) ] [ set size 2 ]
-  ask turtles with [ (ycor = -27)  and (xcor =  24) ] [ set size 2 ]
-  ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 ]
+  ask turtles with [ (ycor =  27)  and (xcor = -24) ] [ set size 2 set color 46.5 ]
+  ask turtles with [ (ycor = -27)  and (xcor = -24) ] [ set size 2 set color 46.5 ]
+  ask turtles with [ (ycor = -27)  and (xcor =  24) ] [ set size 2 set color 46.5 ]
+  ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 set color 46.5 ]
 end
+
+
+
+
+
+
+
+
 
 
 
