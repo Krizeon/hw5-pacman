@@ -162,7 +162,7 @@ to move
 
       if want-down? [
         ask patch ([xcor] of player) (([ycor] of player) - 1) [
-          ifelse any? neighbors with [wall? = true] [
+          ifelse any? neighbors with [wall? = true] or any? neighbors with [player-wall? = true] [
           ] [
             ask player [set heading 180]
           ]
@@ -281,7 +281,6 @@ to set-big-pellets
   ask turtles with [ (ycor = -27)  and (xcor =  24) ] [ set size 2 ]
   ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 ]
 end
-
 
 
 
@@ -597,7 +596,7 @@ Polygon -10899396 true false 189 233 219 188 249 173 279 188 234 218
 Polygon -10899396 true false 180 255 150 210 105 210 75 240 135 240
 
 ghost
-true
+false
 0
 Rectangle -7500403 true true 60 120 240 225
 Circle -7500403 true true 63 33 175
@@ -802,7 +801,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.2
+NetLogo 6.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
