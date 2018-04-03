@@ -142,12 +142,13 @@ to setup-patches
     ]
   ]
   ask patches with [wall? = false  and (pxcor mod 3 = 0) and (pycor mod 3 = 0)][
-    if count (patches in-radius 3 with [wall? = true]) = 4[
+    if count (patches in-radius 3 with [wall? = true]) = 4 or count (patches in-radius 2 with [wall? = true]) = 1 [
       set pcolor green
       set intersection? true
     ]
   ]
-    ;
+  ask patch 0 9 [ set intersection? false set pcolor black]
+  ask patch 0 3 [ set intersection? false set pcolor black]
   ask patch -1 7 [ set player-wall? true ]
   ask patch  0 7 [ set player-wall? true ]
   ask patch  1 7 [ set player-wall? true ]
@@ -207,11 +208,12 @@ end
 
 to enemy-movement
   ask pinky[
-    if [intersection?] of patch-here = true[face one-of neighbors4 with [wall? = false]]
+    let patches-to-turn-toward (patch-set patch-ahead 2 patch-left-and-ahead 90 2 patch-right-and-ahead 90 2)
+    if [intersection?] of patch-here = true[face one-of patches-to-turn-toward with [wall? = false]]
     ifelse [wall?] of patch-ahead 2 = false[
       fd .75
     ][
-      face one-of neighbors4 with [wall? = false]
+      face one-of patches-to-turn-toward with [wall? = false]
     ]
   ]
 
@@ -291,8 +293,6 @@ to set-big-pellets
   ask turtles with [ (ycor = -27)  and (xcor =  24) ] [ set size 2 ]
   ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 ]
 end
-
-
 
 
 
