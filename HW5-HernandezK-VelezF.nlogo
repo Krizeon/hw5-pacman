@@ -14,6 +14,7 @@ globals[
   blinky ;red ghost
   pinky  ;pink ghost
   clyde  ;orange ghost
+  did-i-setup?
 ]
 
 patches-own [
@@ -27,6 +28,7 @@ patches-own [
 breed [ ghosts ghost ]
 
 turtles-own [
+  on-intersection?
   speed
   pellet?
   want-up?
@@ -45,9 +47,10 @@ to setup
     setxy 0 -15
     set heading 0
     set color yellow
-    set speed 0.0001
+    set speed 0.25
     set player self
     set shape "pacman"
+    set on-intersection? false
     turn-setup
   ]
 
@@ -68,6 +71,7 @@ to setup
     set heading 0
     set shape "ghost"
     set pinky self
+    set speed 0.2
     turn-setup
   ]
 
@@ -80,16 +84,14 @@ to setup
     set inky self
     turn-setup
   ]
-  reset-ticks
   reset-timer
   set frame 0
   set time-frame 0
-  set framerate 20
+  set framerate 60
   setup-pellets
 end
 
 to setup-pellets
-
   ; room for 196 total pellets
 
   ; For a place a pellet can be placed at:
@@ -132,12 +134,14 @@ to setup-patches
     ifelse pcolor = 104.7 [
       set player-wall? false
       set wall? true
+      set intersection? false
     ][
       ifelse pcolor = 17.5[
         set player-wall? true
       ][
         set player-wall? false
         set wall? false
+        set intersection? false
       ]
     ]
   ]
@@ -159,59 +163,63 @@ end
 to move
   set time-frame round (timer * framerate)
   if frame < time-frame + 1[
-    show frame
+    ;show frame
     ask player [
+      force-center
       if want-up? [
-        ask patch ([xcor] of player) (([ycor] of player) + 1) [
-          ifelse any? neighbors with [wall? = true] [
-          ] [
+        ask patch ([pxcor] of player) (([pycor] of player) + 1) [
+          if not any? neighbors with [wall? = true] [
             ask player [set heading 0]
           ]
         ]
       ]
       if want-down? [
-        ask patch ([xcor] of player) (([ycor] of player) - 1) [
-          ifelse any? neighbors with [wall? = true] [
-          ] [
+        ask patch ([pxcor] of player) (([pycor] of player) - 1) [
+          if not any? neighbors with [wall? = true] [
             ask player [set heading 180]
           ]
         ]
       ]
       if want-right? [
-        ask patch (([xcor] of player) + 1) ([ycor] of player) [
-          ifelse any? neighbors with [wall? = true] [
-          ] [
+        ask patch (([pxcor] of player) + 1) ([pycor] of player) [
+          if not any? neighbors with [wall? = true][
             ask player [set heading 90]
           ]
         ]
       ]
       if want-left? [
-        ask patch (([xcor] of player) - 1) ([ycor] of player) [
-          ifelse any? neighbors with [wall? = true] [
-          ] [
+        ask patch (([pxcor] of player) - 1) ([pycor] of player) [
+          if not any? neighbors with [wall? = true] [
             ask player [set heading 270]
           ]
         ]
       ]
-      if [wall?] of patch-ahead 2 = false  and [player-wall?] of patch-ahead 3 = false[
-        fd .75
+      if [wall?] of patch-ahead 2 = false  and [player-wall?] of patch-ahead 3 = false [
+;        if [intersection?] of patch-ahead speed and on-intersection? = false[
+;          move-to patch-ahead speed
+;          set on-intersection? true
+;        ]
+;        if [intersection?] of patch-here = false[
+;          set on-intersection? false
+;        ]
+        fd speed
         animate-pacman
       ]
     ]
     enemy-movement
     set frame frame + 1
+    collisions
   ]
-  collisions
-
 end
 
 
 to enemy-movement
   ask pinky[
+    force-center
     let patches-to-turn-toward (patch-set patch-ahead 2 patch-left-and-ahead 90 2 patch-right-and-ahead 90 2)
     if [intersection?] of patch-here = true[face one-of patches-to-turn-toward with [wall? = false]]
     ifelse [wall?] of patch-ahead 2 = false[
-      fd .75
+      fd speed
     ][
       face one-of patches-to-turn-toward with [wall? = false]
     ]
@@ -271,6 +279,18 @@ to turn-setup
 end
 
 
+; this method makes sure that the player and any moving agent is centered on each
+; patch for ease of movement
+to force-center
+  if heading = 0 or heading = 180[
+    set xcor round xcor
+  ]
+    if  heading = 270 or heading = 90[
+    set ycor round ycor
+  ]
+end
+
+
 ;animate Pac-man so that his mouth opens every other frame
 to animate-pacman
   ask player[
@@ -293,8 +313,6 @@ to set-big-pellets
   ask turtles with [ (ycor = -27)  and (xcor =  24) ] [ set size 2 ]
   ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 ]
 end
-
-
 
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -344,10 +362,10 @@ NIL
 BUTTON
 16
 106
-79
+97
 139
-NIL
-move
+play game
+if did-i-setup?[\n  set did-i-setup? true\n  setup\n]\nmove
 T
 1
 T
@@ -427,41 +445,8 @@ NIL
 1
 
 @#$#@#$#@
-## WHAT IS IT?
-
-(a general understanding of what the model is trying to show or explain)
-
-## HOW IT WORKS
-
-(what rules the agents use to create the overall behavior of the model)
-
-## HOW TO USE IT
-
-(how to use the model, including a description of each of the items in the Interface tab)
-
-## THINGS TO NOTICE
-
-(suggested things for the user to notice while running the model)
-
-## THINGS TO TRY
-
-(suggested things for the user to try to do (move sliders, switches, etc.) with the model)
-
-## EXTENDING THE MODEL
-
-(suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
-
-## NETLOGO FEATURES
-
-(interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
-
-## RELATED MODELS
-
-(models in the NetLogo Models Library and elsewhere which are of related interest)
-
-## CREDITS AND REFERENCES
-
-(a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)
+## framerate
+60fps
 @#$#@#$#@
 default
 true
