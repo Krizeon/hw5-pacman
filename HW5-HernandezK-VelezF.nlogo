@@ -5,6 +5,8 @@
 globals[
   start-patch
   player
+  score
+  combo
   max-speed
   frame
   time-frame
@@ -15,6 +17,8 @@ globals[
   pinky  ;pink ghost
   clyde  ;orange ghost
   scared-timer
+  unbox-timer
+  time-before-unbox
 ]
 
 patches-own [
@@ -40,7 +44,11 @@ ghosts-own [ boxed? vulnerable? time-eyes ]
 
 to setup
   ca
+  set score 0
+  set combo 1
   setup-patches
+  set unbox-timer 0
+  set time-before-unbox 10
   create-turtles 1 [
     set size 3
     setxy 0 -15
@@ -94,7 +102,7 @@ to setup
     set color 25
     set heading 0
     set shape "ghost"
-    set inky self
+    set clyde self
     turn-setup
     set boxed? true
     set vulnerable? false
@@ -106,6 +114,7 @@ to setup
   set time-frame 0
   set framerate 20
   setup-pellets
+
 end
 
 to setup-pellets
@@ -180,7 +189,7 @@ end
 to move
   set time-frame round (timer * framerate)
   if frame < time-frame + 1[
-    show frame
+    ;show frame
     ask player [
       if want-up? [
         ask patch ([xcor] of player) (([ycor] of player) + 1) [
@@ -243,23 +252,68 @@ to move
         set shape "ghost"
       ]
     ]
-    enemy-movement
+    ask ghosts with [not boxed?] [scatter]
+
+
+    ; slowly frees the ghosts until they've all started roaming
+    if any? ghosts with [boxed? and not vulnerable?] [
+      if timer - unbox-timer >= time-before-unbox [
+        if [boxed?] of clyde = true[
+          ask clyde [ unbox ]
+        ]
+      ]
+
+      if (timer - unbox-timer) >= (time-before-unbox * 2 ) [
+        if [boxed?] of inky = true[
+          ask inky [ unbox ]
+        ]
+      ]
+
+      if (timer - unbox-timer) >= (time-before-unbox * 3 ) [
+        if [boxed?] of blinky = true[
+          ask blinky [ unbox ]
+        ]
+      ]
+
+    ]
+
     set frame frame + 1
   ]
+  show timer
   collisions
 
 end
 
 
-to enemy-movement
-  ask pinky[
-    let patches-to-turn-toward (patch-set patch-ahead 2 patch-left-and-ahead 90 2 patch-right-and-ahead 90 2)
-    if [intersection?] of patch-here = true[face one-of patches-to-turn-toward with [wall? = false]]
-    ifelse [wall?] of patch-ahead 2 = false[
-      fd .75
+
+to unbox
+  if xcor < 0 [
+   set heading 90
+   fd 0.75
+  ]
+  if xcor > 0 [
+   set heading 270
+   fd 0.75
+  ]
+  if xcor = 0 [
+    ifelse ycor >= 9 [
+      setxy 0 9
+      set boxed? false
     ][
-      face one-of patches-to-turn-toward with [wall? = false]
+      set heading 0
+      fd 0.75
     ]
+  ]
+end
+
+
+to scatter
+  let patches-to-turn-toward (patch-set patch-ahead 2 patch-left-and-ahead 90 2 patch-right-and-ahead 90 2)
+  if [intersection?] of patch-here = true[face one-of patches-to-turn-toward with [wall? = false]]
+  ifelse [wall?] of patch-ahead 2 = false[
+    fd .75
+  ][
+    face one-of patches-to-turn-toward with [wall? = false]
   ]
 
 end
@@ -268,20 +322,30 @@ end
 to collisions
   ask turtles with [pellet? = true] [
    if distance player <= 1 [
-      if size = 2 [
-       frightened-mode
+      ifelse size = 2 [
+        set score (score + 50)
+        frightened-mode
+      ][
+        set score (score + 10)
       ]
+      show score
       die
     ]
   ]
   ask ghosts [
    ifelse vulnerable? = false[
      if distance player < 1 [
-       kill-player
+       ;kill-player
       ]
     ][
-      if distance player < 1.25 [
+      if (distance player < 1.25) and (shape != "eyes") [
+        set score (score + (200 * combo))
+        if combo < 4[
+          set combo (combo + 1)
+        ]
+        show score
         get-eaten
+
       ]
     ]
   ]
@@ -299,6 +363,9 @@ end
 
 to frightened-mode
   set scared-timer timer
+  if not any? ghosts with [shape = "scared"] [
+   set combo 1
+  ]
   ask ghosts with [shape != "eyes"] [
     set shape "scared"
     set vulnerable? true
@@ -371,7 +438,6 @@ to set-big-pellets
   ask turtles with [ (ycor = -27)  and (xcor =  24) ] [ set size 2 ]
   ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 ]
 end
-
 
 @#$#@#$#@
 GRAPHICS-WINDOW
