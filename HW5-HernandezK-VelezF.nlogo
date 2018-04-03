@@ -14,6 +14,7 @@ globals[
   blinky ;red ghost
   pinky  ;pink ghost
   clyde  ;orange ghost
+  scared-timer
 ]
 
 patches-own [
@@ -35,7 +36,7 @@ turtles-own [
   want-right?
 ]
 
-ghosts-own [ ]
+ghosts-own [ boxed? vulnerable? time-eyes ]
 
 to setup
   ca
@@ -59,6 +60,8 @@ to setup
     set shape "ghost"
     set blinky self
     turn-setup
+    set boxed? true
+    set vulnerable? false
   ]
 
   create-ghosts 1 [
@@ -69,17 +72,34 @@ to setup
     set shape "ghost"
     set pinky self
     turn-setup
+    set boxed? false
+    set vulnerable? false
   ]
 
   create-ghosts 1 [
     set size 4
     setxy 3 3
-    set color blue + 1
+    set color blue + 1.5
     set heading 0
     set shape "ghost"
     set inky self
     turn-setup
+    set boxed? true
+    set vulnerable? false
   ]
+
+  create-ghosts 1 [
+    set size 4
+    setxy 0 3
+    set color 25
+    set heading 0
+    set shape "ghost"
+    set inky self
+    turn-setup
+    set boxed? true
+    set vulnerable? false
+  ]
+
   reset-ticks
   reset-timer
   set frame 0
@@ -109,13 +129,14 @@ to setup-pellets
       ;4
       with [ (pxcor mod 3 = 0) and (pycor mod 3 = 0) ]
     )
-
-    create-turtles 1 [
-      set size .5
-      set pellet? true
-      set shape "circle"
-      set color white
-      setxy ([pxcor] of good-loc) ([pycor] of good-loc)
+    if good-loc != nobody [
+      create-turtles 1 [
+        set size .5
+        set pellet? true
+        set shape "circle"
+        set color white
+        setxy ([pxcor] of good-loc) ([pycor] of good-loc)
+      ]
     ]
   ]
   ; it was difficult to restrict the program from creating pellets in the small 4 areas where the player cannot go to with making the code really messy.
@@ -198,6 +219,30 @@ to move
         animate-pacman
       ]
     ]
+    ifelse timer - scared-timer > 8 [
+      ask ghosts with [shape != "eyes"] [
+        set shape "ghost"
+        set vulnerable? false
+      ]
+    ][
+      ask ghosts with [vulnerable? and shape != "eyes"] [
+        if (timer - scared-timer) > 5 and (timer - scared-timer) < 6  [
+          set shape "flashing scared"
+        ]
+        if (timer - scared-timer) > 6 and (timer - scared-timer) < 7 [
+          set shape "scared"
+        ]
+        if (timer - scared-timer) > 7 and (timer - scared-timer) < 8 [
+          set shape "flashing scared"
+        ]
+      ]
+    ]
+    ask ghosts with [shape = "eyes"] [
+      if timer - time-eyes > 5 [
+        set vulnerable? false
+        set shape "ghost"
+      ]
+    ]
     enemy-movement
     set frame frame + 1
   ]
@@ -223,10 +268,43 @@ end
 to collisions
   ask turtles with [pellet? = true] [
    if distance player <= 1 [
-     die
+      if size = 2 [
+       frightened-mode
+      ]
+      die
+    ]
+  ]
+  ask ghosts [
+   ifelse vulnerable? = false[
+     if distance player < 1 [
+       kill-player
+      ]
+    ][
+      if distance player < 1.25 [
+        get-eaten
+      ]
     ]
   ]
 end
+
+to get-eaten
+  set time-eyes timer
+  set shape "eyes"
+
+end
+
+to kill-player
+  ask player [ die ]
+end
+
+to frightened-mode
+  set scared-timer timer
+  ask ghosts with [shape != "eyes"] [
+    set shape "scared"
+    set vulnerable? true
+  ]
+end
+
 
 ; player turns up
 to turn-up
@@ -293,7 +371,6 @@ to set-big-pellets
   ask turtles with [ (ycor = -27)  and (xcor =  24) ] [ set size 2 ]
   ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 ]
 end
-
 
 
 @#$#@#$#@
@@ -547,6 +624,15 @@ false
 0
 Circle -7500403 true true 90 90 120
 
+eyes
+false
+0
+Rectangle -16777216 true false 120 225 210 225
+Circle -1 true false 86 86 67
+Circle -1 true false 161 86 67
+Circle -13345367 true false 193 118 32
+Circle -13345367 true false 118 118 32
+
 face happy
 false
 0
@@ -587,6 +673,23 @@ Rectangle -7500403 true true 60 15 75 300
 Polygon -7500403 true true 90 150 270 90 90 30
 Line -7500403 true 75 135 90 135
 Line -7500403 true 75 45 90 45
+
+flashing scared
+false
+0
+Rectangle -1 true false 60 120 240 225
+Circle -1 true false 63 33 175
+Rectangle -16777216 true false 120 225 210 225
+Polygon -1 true false 60 210 60 255 90 225 120 255 150 225 180 255 210 225 240 255 240 210 60 210
+Rectangle -13345367 true false 105 105 135 135
+Rectangle -13345367 true false 165 105 195 135
+Rectangle -13345367 true false 90 180 105 195
+Rectangle -13345367 true false 135 180 165 195
+Rectangle -13345367 true false 195 180 210 195
+Rectangle -13345367 true false 165 195 195 210
+Rectangle -13345367 true false 105 195 135 210
+Rectangle -13345367 true false 210 195 225 210
+Rectangle -13345367 true false 75 195 90 210
 
 flower
 false
@@ -677,6 +780,23 @@ Polygon -7500403 true true 165 180 165 210 225 180 255 120 210 135
 Polygon -7500403 true true 135 105 90 60 45 45 75 105 135 135
 Polygon -7500403 true true 165 105 165 135 225 105 255 45 210 60
 Polygon -7500403 true true 135 90 120 45 150 15 180 45 165 90
+
+scared
+false
+0
+Rectangle -13345367 true false 60 120 240 225
+Circle -13345367 true false 63 33 175
+Rectangle -16777216 true false 120 225 210 225
+Polygon -13345367 true false 60 210 60 255 90 225 120 255 150 225 180 255 210 225 240 255 240 210 60 210
+Rectangle -1 true false 105 105 135 135
+Rectangle -1 true false 165 105 195 135
+Rectangle -1 true false 90 180 105 195
+Rectangle -1 true false 135 180 165 195
+Rectangle -1 true false 195 180 210 195
+Rectangle -1 true false 165 195 195 210
+Rectangle -1 true false 105 195 135 210
+Rectangle -1 true false 210 195 225 210
+Rectangle -1 true false 75 195 90 210
 
 sheep
 false
@@ -785,23 +905,6 @@ Polygon -10899396 true false 132 85 134 64 107 51 108 17 150 2 192 18 192 52 169
 Polygon -10899396 true false 85 204 60 233 54 254 72 266 85 252 107 210
 Polygon -7500403 true true 119 75 179 75 209 101 224 135 220 225 175 261 128 261 81 224 74 135 88 99
 
-vulnerable-ghost
-false
-0
-Rectangle -13345367 true false 60 120 240 225
-Circle -13345367 true false 63 33 175
-Rectangle -16777216 true false 120 225 210 225
-Polygon -13345367 true false 60 210 60 255 90 225 120 255 150 225 180 255 210 225 240 255 240 210 60 210
-Rectangle -1 true false 105 105 135 135
-Rectangle -1 true false 165 105 195 135
-Rectangle -1 true false 90 180 105 195
-Rectangle -1 true false 135 180 165 195
-Rectangle -1 true false 195 180 210 195
-Rectangle -1 true false 165 195 195 210
-Rectangle -1 true false 105 195 135 210
-Rectangle -1 true false 210 195 225 210
-Rectangle -1 true false 75 195 90 210
-
 wheel
 false
 0
@@ -828,7 +931,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.2
+NetLogo 6.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
