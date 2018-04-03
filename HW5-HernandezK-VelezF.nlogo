@@ -26,7 +26,6 @@ patches-own [
 
 breed [ ghosts ghost ]
 
-turtles-own [ speed pellet? ]
 turtles-own [
   speed
   pellet?
