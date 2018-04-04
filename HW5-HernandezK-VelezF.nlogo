@@ -29,15 +29,12 @@ breed [ ghosts ghost ]
 
 turtles-own [
   on-intersection?
-  speed
   pellet?
   want-up?
   want-down?
   want-left?
   want-right?
 ]
-
-ghosts-own [speed]
 
 to setup
   ca
@@ -71,7 +68,7 @@ to setup
     set heading 0
     set shape "ghost"
     set pinky self
-    set speed 0.1
+    set speed 0.4
     set on-intersection? false
     turn-setup
   ]
@@ -451,6 +448,21 @@ D
 NIL
 NIL
 1
+
+SLIDER
+30
+316
+202
+349
+speed
+speed
+0
+1
+0.4
+0.05
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## framerate
