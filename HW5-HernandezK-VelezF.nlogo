@@ -153,6 +153,7 @@ to setup
     set speed enemy-speed
     set sight-range 9 ;shortest range of sight
   ]
+
   setup-lives
   reset-ticks
   reset-timer
@@ -162,6 +163,7 @@ to setup
 end
 
 
+; places a fruit near the middle of the maze once per round
 to place-fruit
   set list-of-fruit (list "banana" "strawberry" "apple")
   create-fruits 1[
@@ -267,9 +269,17 @@ end
 
 
 to move
+  ifelse wait? [
+    ask patch 3 -6 [ set plabel-color yellow set plabel "READY?"]
+  ][
+    ask patch 3 -6 [ set plabel ""]
+  ]
+
   ask score-patch [set plabel word "SCORE: " score] ;update the score constantly
   if lives < 0 [
     ask turtles [ die ]
+    ask patch 4 -6 [ set plabel-color yellow set plabel "GAME OVER"]
+    show score
     stop
   ]
   if not wait? [
@@ -283,34 +293,17 @@ to move
     set time-frame round (timer * framerate) ; count 1 frame every 1/60th of a second
     if frame < time-frame + 1[ ; this is run one frame after another
       move-player
-      ; Waits for a ghost to be in the "frightened" state for a max of 8 seconds
-      ; before becoming harmful again.
-      ifelse timer - frightened-timer > 8 [
-        ask ghosts with [shape != "eaten"] [
-          set shape "ghost"
-          set speed enemy-speed
-          set frightened? false
-        ]
-      ][
-        ; Makes ghosts  that are frightened flash for the last 3 seconds before
-        ; they return to normal
-        ask ghosts with [frightened? and shape != "eaten"] [
-          if (timer - frightened-timer) > 5 and (timer - frightened-timer) < 6  [
-            set shape "flashing frightened"
-          ]
-          if (timer - frightened-timer) > 6 and (timer - frightened-timer) < 7 [
-            set shape "frightened"
-          ]
-          if (timer - frightened-timer) > 7 and (timer - frightened-timer) < 8 [
-            set shape "flashing frightened"
-          ]
-        ]
-      ]
+
+      ; Makes sure ghosts don't stay in frightened mode longer than 8 seconds
+      ; Also flashes ghosts for the last three seconds before
+      ;     frightened mode ends
+      check-frightened
 
       ; Ghosts that are eaten move to their box and become active again
       ask ghosts with [shape = "eaten"] [
         restart
       ]
+
       enemy-movement
       set frame frame + 1
     ]
@@ -325,13 +318,13 @@ to move
       ]
     ]
   ]
+
   ; if the level is finished then wait until the next round starts
-  if (timer >= 2) and wait? [
+  if (timer >= 2) and wait?[
    set wait? false
     set level-done? false
     reset-timer
   ]
-
 end
 
 
@@ -407,9 +400,36 @@ to enemy-movement
   ]
 end
 
+to check-frightened
+  ; Waits for a ghost to be in the "frightened" state for a max of 8 seconds
+  ; before becoming harmful again.
+  ifelse timer - frightened-timer > 8 [
+    ask ghosts with [shape != "eaten"] [
+      set shape "ghost"
+      set speed enemy-speed
+      set frightened? false
+    ]
+  ][
+    ; Makes ghosts  that are frightened flash for the last 3 seconds before
+    ; they return to normal
+    ask ghosts with [frightened? and shape != "eaten"] [
+      if (timer - frightened-timer) > 5 and (timer - frightened-timer) < 6  [
+        set shape "flashing frightened"
+      ]
+      if (timer - frightened-timer) > 6 and (timer - frightened-timer) < 7 [
+        set shape "frightened"
+      ]
+      if (timer - frightened-timer) > 7 and (timer - frightened-timer) < 8 [
+        set shape "flashing frightened"
+      ]
+    ]
+  ]
+end
+
 
 ; procedure for leaving the ghost prison
 to roam
+
   ; First checks if the ghost is in the middle of their prison so they can leave it.
   ; If not, moves them towards it.
   ; If so, then checks if they're out of the box.
@@ -553,7 +573,7 @@ to kill-player
   ifelse lives >= 0 [
     next-level
   ][
-   show "Game Over"
+    ask patch 3 -6 [ set plabel-color red set plabel "GAME OVER"]
   ]
 end
 
@@ -780,9 +800,9 @@ NIL
 BUTTON
 16
 106
-117
+132
 139
-Play Pacman
+PLAY PAC-MAN
 move
 T
 1
@@ -863,8 +883,49 @@ NIL
 1
 
 @#$#@#$#@
-## framerate
-60fps
+## Kevin Hernandez, Felix Velez
+
+## HOW TO PLAY
+
+To start the game, first press the "setup" button. Then press
+"PLAY PAC-MAN"
+
+You are Pac-Man! And boy are you hungry for pellets!
+
+Your goal is to eat every pellet in the level while trying to avoid the
+4 spooky ghosts looking to scare you. Do that, and you move on to the next level.
+But you only have 3 tries!
+
+The only conrtols are using WASD to move Pac-Man through the maze. You
+do not have to hold the keys. Just press the direction to want Pac-Man to turn
+once and he'll do it when he can.
+
+In the four corners of the maze are power pellets. These big ones
+allow Pac-Man to eat even the ghosts (for a limited time)
+and send them back to their little box.
+
+If you eat ghosts consecutively, the points for each ghost multiplies.
+
+
+## THE AGENTS
+
+The agents include Pac-Man (the player) and the 4 ghosts (autonomous).
+
+One by one a new ghost is programmed to leave the prison to pursue the player. Generally, they will randomly choose directions (except backwards). But if the player is within their line of sight, they will try to track down the player by following the player's movements.
+
+Each ghost is slightly different in speed and vision. As the player progresses to new levels, the ghosts slowly get more agressive, increasing their speed and shortening the time they stay in their prison.
+
+## CREDITS
+
+We used this page as a reference in recreating the behaviors from the Pac-Man game:
+
+-http://gameinternals.com/post/2072558330/understanding-pac-man-ghost-behavior
+
+
+Other pages include:
+
+-The Netlogo Online Dictionary
+-Stack Overflow
 @#$#@#$#@
 default
 true
