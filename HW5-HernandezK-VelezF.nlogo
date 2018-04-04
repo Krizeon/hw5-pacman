@@ -6,10 +6,10 @@ globals[
   player ; the player, whom controls pacman
   score ; the game score (shown at top left corner of maze
   score-patch ; the patch that contains a label with the game score
+  lives-patch ; the patch where the interface for lives remaining is displayed
   multiplier ; the multiplier for consecutive ghosts eaten during a given "power up" duration
   lives
   kill-player?
-  score
   max-speed
   frame
   time-frame
@@ -25,6 +25,8 @@ globals[
   level-done? ; if true, move to the next level
   player-speed ; the player's speed (does not change after each level)
   enemy-speed ; the ghost's speed (increments slightly every level)
+  list-of-fruit ; list of strings: apple, strawberry, apple
+  fruit-placed? ;true if a fruit has been placed during a round
 ]
 
 patches-own [
@@ -37,6 +39,9 @@ patches-own [
 breed [ pacmans pacman ] ; the agent the player plays as
 breed [ ghosts ghost ] ; the colorful autonomous ghosts
 breed [ pellets pellet ] ; the small white pelets scattered across the maze
+breed [ life-reps life-rep ]
+breed [ fruits fruit ]
+
 
 turtles-own [
   on-intersection? ; true if turtle is on a patch with intersection? = true
@@ -55,25 +60,27 @@ ghosts-own [
   sight-range ; the range of sight in patches, varies by each ghost
 ]
 
+; setup the entire game!
 to setup
   ca
-  set score-patch patch -12 30
+  set fruit-placed? false
+  set score-patch patch -12 30 ; label the top left corner
   ask score-patch [set plabel "SCORE: 0000000"]
   set player-speed 0.22
-  set enemy-speed player-speed + 0.05 ; set ghosts to be faster than player by a minute amount
+  set enemy-speed player-speed - 0.02 ; set ghosts to be faster than player by a minute amount
   set wait? true ; allow player to get ready at the start of the game, so wait
 
   set kill-player? false
   set lives 2
- 
+
   set level-done? true
   set score 0 ; reset score
   set multiplier 200
   setup-patches
   set roam-timer 0
   set time-before-roam 10
-  setup-pellets
 
+  ;create the player
   create-pacmans 1 [
     set size 3
     setxy 0 -15 ;default starting position
@@ -86,6 +93,7 @@ to setup
     set speed player-speed
   ]
 
+  ;create red ghost
   create-ghosts 1 [
     set size 4
     setxy -3 3
@@ -96,10 +104,11 @@ to setup
     turn-setup
     set boxed? true
     set frightened? false
-    set speed enemy-speed
+    set speed enemy-speed + 0.005
     set sight-range 18 ;longest range of sight
   ]
 
+  ; create pink ghost
   create-ghosts 1 [
     set size 4
     setxy 0 9
@@ -115,10 +124,11 @@ to setup
     set sight-range 12
   ]
 
+  ; create blue ghost
   create-ghosts 1 [
     set size 4
     setxy 3 3
-    set color blue + 1.5 ; we wanted a slightly brighter blue than the default
+    set color blue + 2.5 ; we wanted a slightly brighter blue than the default
     set heading 0
     set shape "ghost"
     set inky self
@@ -129,6 +139,7 @@ to setup
     set sight-range 12
   ]
 
+  ; create orange ghost
   create-ghosts 1 [
     set size 4
     setxy 0 3
@@ -142,14 +153,42 @@ to setup
     set speed enemy-speed
     set sight-range 9 ;shortest range of sight
   ]
-
+  setup-lives
   reset-ticks
   reset-timer
   set frame 0
   set time-frame 0
   set framerate 60 ; game runs at 60 frames per second (FPS), so all agents move "at the same time" every frame for consistency
+end
 
 
+to place-fruit
+  set list-of-fruit (list "banana" "strawberry" "apple")
+  create-fruits 1[
+    setxy 0 -3
+    set size 3
+    set shape one-of list-of-fruit
+    if shape = "banana"[ set color yellow ]
+    if shape = "strawberry" [ set color pink ]
+    if shape = "apple" [ set color red ]
+  ]
+end
+
+
+to setup-lives
+  set lives-patch (patch -20 -30)
+  ask lives-patch  [set plabel "LIVES: "]
+  let temp -17
+  repeat 3[
+    create-life-reps 1[
+      set shape "pacman"
+      set size 2
+      set heading 90
+      set color yellow
+      setxy temp -30
+    ]
+    set temp temp + 4
+  ]
 end
 
 
@@ -231,13 +270,18 @@ to move
   ask score-patch [set plabel word "SCORE: " score] ;update the score constantly
   if lives < 0 [
     ask turtles [ die ]
-    show score
-   stop
+    stop
   ]
   if not wait? [
+    show timer
+    if timer > 3[
+      if not any? fruits and not fruit-placed?[
+        place-fruit
+        set fruit-placed? true
+      ]
+    ]
     set time-frame round (timer * framerate) ; count 1 frame every 1/60th of a second
     if frame < time-frame + 1[ ; this is run one frame after another
-      ;show frame
       move-player
       ; Waits for a ghost to be in the "frightened" state for a max of 8 seconds
       ; before becoming harmful again.
@@ -320,6 +364,7 @@ to scatter
 end
 
 
+; determines all the autonomous behaviors of the ghosts
 to enemy-movement
   ask ghosts with [shape != "eaten"] [
     ifelse not boxed? [
@@ -383,6 +428,8 @@ to roam
   ]
 end
 
+
+;procedure for making eaten ghosts glide back to their prison
 to restart
   face patch 0 3
   set speed enemy-speed
@@ -393,10 +440,11 @@ to restart
     set boxed? true
     set frightened? false
     set shape "ghost"
-    ;set speed enemy-speed
   ]
 end
 
+
+; determines what agents should do when colliding into each other (not walls)
 to collisions
   ; Anytime the score is increased, the player is asked to show it.
 
@@ -412,6 +460,15 @@ to collisions
         set score (score + 10)
       ]
       ask player [show score]
+      die
+    ]
+  ]
+
+  ask fruits[
+    if distance player <= 1[
+      if shape = "banana" [set score score + 3000]
+      if shape = "strawberry" [set score score + 1000]
+      if shape = "apple" [set score score + 500]
       die
     ]
   ]
@@ -437,7 +494,7 @@ to collisions
   ]
 end
 
-
+; makes ghost become disembodied
 to get-eaten
   set time-eaten timer
   set shape "eaten"
@@ -446,7 +503,7 @@ end
 
 
 to next-level
-
+  set fruit-placed? false
   set multiplier 200
   set roam-timer 0
   set level-done? true
@@ -470,7 +527,6 @@ to next-level
   ask inky   [ setxy 3 3 set frightened? false set boxed? true set shape "ghost" set heading 0 ]
   ask clyde  [ setxy 0 3 set frightened? false set boxed? true set shape "ghost" set heading 0 ]
 
-
   reset-ticks
   reset-timer
   set frame 0
@@ -479,15 +535,18 @@ to next-level
 end
 
 
+; kill the player and subtract lives
 to kill-player
-   repeat 5 [
+   repeat 5 [ ;animate pacman's death (mini explosion?)
    ask player [
-      set size (size + 0.1)
+      set size (size - 0.3)
       set color (color + 1)
 
       wait 0.1
     ]
   ]
+  if any? fruits [ask fruits [die]]
+  ask one-of life-reps [die]
   set lives (lives - 1)
   set kill-player? false
 
@@ -499,6 +558,8 @@ to kill-player
 end
 
 
+; chase the player if within the ghost's wide line of sight by trying to track the player's nearby movements
+; ghosts in chasing mode will try to take the shorter path to the player
 to chase
   let temp-distance 0 ;the distance from the ghost's current patch to the player
   let player-position patch-at [pxcor] of player [pycor] of player ;the patch where the player rests at this moment
@@ -514,7 +575,6 @@ to chase
     set on-intersection? true
   ]
   ifelse [wall?] of patch-ahead 2 = false[
-    ;fd speed
     if [intersection?] of patches in-radius 1 = false or [intersection?] of patch-here = false[
       set on-intersection? false
     ]
@@ -535,9 +595,7 @@ end
 
 to frightened-mode
   set frightened-timer timer
-  show speed
   set speed (speed * 0.5)
-  show speed
   if not any? ghosts with [shape = "frightened"] [
    set multiplier 200
   ]
@@ -700,7 +758,7 @@ GRAPHICS-WINDOW
 0
 1
 ticks
-30.0
+60.0
 
 BUTTON
 17
@@ -722,9 +780,9 @@ NIL
 BUTTON
 16
 106
-97
+117
 139
-move
+Play Pacman
 move
 T
 1
@@ -818,10 +876,36 @@ true
 0
 Polygon -7500403 true true 150 0 135 15 120 60 120 105 15 165 15 195 120 180 135 240 105 270 120 285 150 270 180 285 210 270 165 240 180 180 285 195 285 165 180 105 180 60 165 15
 
+apple
+false
+0
+Polygon -7500403 true true 33 58 0 150 30 240 105 285 135 285 150 270 165 285 195 285 255 255 300 150 268 62 226 43 194 36 148 32 105 35
+Line -16777216 false 106 55 151 62
+Line -16777216 false 157 62 209 57
+Polygon -6459832 true false 152 62 158 62 160 46 156 30 147 18 132 26 142 35 148 46
+Polygon -16777216 false false 132 25 144 38 147 48 151 62 158 63 159 47 155 30 147 18
+
 arrow
 true
 0
 Polygon -7500403 true true 150 0 0 150 105 150 105 293 195 293 195 150 300 150
+
+banana
+false
+0
+Polygon -7500403 false true 25 78 29 86 30 95 27 103 17 122 12 151 18 181 39 211 61 234 96 247 155 259 203 257 243 245 275 229 288 205 284 192 260 188 249 187 214 187 188 188 181 189 144 189 122 183 107 175 89 158 69 126 56 95 50 83 38 68
+Polygon -7500403 true true 39 69 26 77 30 88 29 103 17 124 12 152 18 179 34 205 60 233 99 249 155 260 196 259 237 248 272 230 289 205 284 194 264 190 244 188 221 188 185 191 170 191 145 190 123 186 108 178 87 157 68 126 59 103 52 88
+Line -16777216 false 54 169 81 195
+Line -16777216 false 75 193 82 199
+Line -16777216 false 99 211 118 217
+Line -16777216 false 241 211 254 210
+Line -16777216 false 261 224 276 214
+Polygon -16777216 true false 283 196 273 204 287 208
+Polygon -16777216 true false 36 114 34 129 40 136
+Polygon -16777216 true false 46 146 53 161 53 152
+Line -16777216 false 65 132 82 162
+Line -16777216 false 156 250 199 250
+Polygon -16777216 true false 26 77 30 90 50 85 39 69
 
 box
 false
@@ -1199,7 +1283,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.1
+NetLogo 6.0.2
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
