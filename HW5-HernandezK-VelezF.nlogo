@@ -21,6 +21,8 @@ globals[
   time-before-roam
   wait?
   level-done?
+  player-speed
+  enemy-speed
 ]
 
 patches-own [
@@ -41,12 +43,15 @@ turtles-own [
   want-down?
   want-left?
   want-right?
+  speed
 ]
 
 ghosts-own [ boxed? frightened? time-eaten ]
 
 to setup
   ca
+  set player-speed 0.15
+  set enemy-speed player-speed + 0.05
   set wait? true
   set level-done? true
   set score 0
@@ -59,11 +64,11 @@ to setup
     setxy 0 -15
     set heading 0
     set color yellow
-    set speed 0.25
     set player self
     set shape "pacman"
     set on-intersection? false
     turn-setup
+    set speed player-speed
   ]
 
   create-ghosts 1 [
@@ -76,6 +81,7 @@ to setup
     turn-setup
     set boxed? true
     set frightened? false
+    set speed enemy-speed
   ]
 
   create-ghosts 1 [
@@ -85,11 +91,11 @@ to setup
     set heading 0
     set shape "ghost"
     set pinky self
-    set speed 0.4
     set on-intersection? false
     turn-setup
     set boxed? false
     set frightened? false
+    set speed enemy-speed
   ]
 
   create-ghosts 1 [
@@ -102,6 +108,7 @@ to setup
     turn-setup
     set boxed? true
     set frightened? false
+    set speed enemy-speed
   ]
 
   create-ghosts 1 [
@@ -114,6 +121,7 @@ to setup
     turn-setup
     set boxed? true
     set frightened? false
+    set speed enemy-speed
   ]
 
   reset-ticks
@@ -253,13 +261,13 @@ to move
 
             if (timer - roam-timer) >= (time-before-roam * 2 ) [
               if [boxed?] of inky = true[
-                ask inky [ set heading 270 roam ]
+                ask inky [ set heading 270 roam if xcor < 0 [ move-to patch 0 3]]
               ]
             ]
 
             if (timer - roam-timer) >= (time-before-roam * 3 ) [
               if [boxed?] of blinky = true[
-                ask blinky [ set heading 90 roam ]
+                ask blinky [ set heading 90 roam if xcor > 0 [ move-to patch 0 3]]
               ]
             ]
           ]
@@ -275,7 +283,7 @@ to move
     ]
   ]
 
-  if timer > 3 and level-done? [
+  if timer > 2 and level-done? [
    set wait? false
     set level-done? false
     reset-timer
@@ -285,22 +293,26 @@ end
 
 to scatter
   force-center
+
+  ;handle when and which direction to turn at a marked intersection
+  ;when at an intersection, go either forward, left, or right
   if [intersection?] of patch-here = true and on-intersection? = false[
     move-to one-of patches with [intersection? = true and distance myself < 1]
-    ;show "yoo"
+    let patches-to-turn-toward (patch-set patch-ahead 2 patch-left-and-ahead 90 2 patch-right-and-ahead 90 2)
+    face one-of patches-to-turn-toward with [wall? = false]
     set on-intersection? true
   ]
   ifelse [wall?] of patch-ahead 2 = false[
     fd speed
     if [intersection?] of patches in-radius 1 = false or [intersection?] of patch-here = false[
       set on-intersection? false
-      ;show "on intersection!"
     ]
   ][
-    if [wall?] of patch-right-and-ahead 90 2 = false[
+
+    if [wall?] of patch-right-and-ahead 90 2 = false[ ; if ghost reaches a corner where only available turn is right
       rt 90
     ]
-    if [wall?] of patch-left-and-ahead 90 2 = false[
+    if [wall?] of patch-left-and-ahead 90 2 = false[ ; if ghost reaches a corner where only available turn is left
       lt 90
     ]
 
@@ -315,6 +327,7 @@ to roam
   ; If not, moves them towards it.
   ; If so, then checks if they're out of the box.
   ;        If not, makes them move upwards until they are.
+
   ifelse xcor = 0 [
     ifelse ycor >= 9 [
       setxy 0 9            ; just to be sure that the ghost is centered precisely.
@@ -322,7 +335,6 @@ to roam
     ][
       set heading 0
       fd speed
-
     ]
   ][
    fd speed
@@ -668,21 +680,6 @@ D
 NIL
 NIL
 1
-
-SLIDER
-30
-316
-202
-349
-speed
-speed
-0
-1
-0.4
-0.05
-1
-NIL
-HORIZONTAL
 
 @#$#@#$#@
 ## framerate
