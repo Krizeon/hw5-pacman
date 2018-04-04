@@ -5,6 +5,8 @@
 globals[
   start-patch
   player
+  lives
+  kill-player?
   score
   multiplier
   max-speed
@@ -36,6 +38,7 @@ patches-own [
 
 breed [ ghosts ghost ]
 breed [ pellets pellet ]
+breed [ pacmans pacman ]
 
 turtles-own [
   on-intersection?
@@ -51,6 +54,8 @@ ghosts-own [ boxed? frightened? time-eaten sight-range]
 
 to setup
   ca
+  set kill-player? false
+  set lives 2
   set player-speed 0.22
   set enemy-speed player-speed + 0.05
   set wait? true
@@ -60,7 +65,8 @@ to setup
   setup-patches
   set roam-timer 0
   set time-before-roam 10
-  create-turtles 1 [
+
+  create-pacmans 1 [
     set size 3
     setxy 0 -15
     set heading 0
@@ -207,6 +213,14 @@ end
 
 
 to move
+
+  if lives < 0 [
+    ask turtles [ die ]
+    show score
+   stop
+  ]
+
+
   if not wait? [
     set time-frame round (timer * framerate)
     if frame < time-frame + 1[
@@ -247,17 +261,23 @@ to move
     ]
     collisions
     ; Checks if the player has beaten the level (collected all pellets)
-    if not any? pellets [
+    ifelse not any? pellets [
       next-level
+      setup-pellets
+    ][
+      if kill-player? [
+       kill-player
+      ]
     ]
   ]
 
 
-  if timer > 2 and level-done? [
+  if (timer >= 2) and wait? [
    set wait? false
     set level-done? false
     reset-timer
   ]
+
 end
 
 
@@ -387,7 +407,7 @@ to collisions
   ask ghosts [
    ifelse frightened? = false[
      if distance player < 1 [
-       ;kill-player
+       set kill-player? true
       ]
     ][
       if (distance player < 1.25) and (shape != "eaten") [
@@ -422,7 +442,13 @@ to next-level
     set time-before-roam (time-before-roam * 0.8)
   ]
 
-  ask player [ setxy 0 -15 ]
+  ask player [
+    setxy 0 -15
+    set heading 0
+    set size 3
+    set color yellow
+    set hidden? false
+  ]
   ask pinky  [ setxy 0 9 set frightened? false set shape "ghost" set heading 0 ]
   ask blinky [ setxy -3 3 set frightened? false set boxed? true set shape "ghost" set heading 0 ]
   ask inky   [ setxy 3 3 set frightened? false set boxed? true set shape "ghost" set heading 0 ]
@@ -433,13 +459,27 @@ to next-level
   reset-timer
   set frame 0
   set time-frame 0
-  set framerate 20
-  setup-pellets
+  set framerate 60
 end
 
 
 to kill-player
-  ask player [ die ]
+   repeat 5 [
+   ask player [
+      set size (size + 0.1)
+      set color (color + 1)
+
+      wait 0.1
+    ]
+  ]
+  set lives (lives - 1)
+  set kill-player? false
+
+  ifelse lives >= 0 [
+    next-level
+  ][
+   show "Game Over"
+  ]
 end
 
 
