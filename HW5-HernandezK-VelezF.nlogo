@@ -182,7 +182,7 @@ to setup-patches
   ; determine all the intersections of the maze
   ask patches with [wall? = false  and (pxcor mod 3 = 0) and (pycor mod 3 = 0)][
     if count (patches in-radius 3 with [wall? = true]) = 4 or count (patches in-radius 2 with [wall? = true]) = 1 [
-      ;set pcolor green       ;Used to see the main intersections that the ghosts randomly choose paths from
+      set pcolor green       ;Used to see the main intersections that the ghosts randomly choose paths from
       set intersection? true
     ]
   ]
@@ -202,44 +202,7 @@ to move
     set time-frame round (timer * framerate)
     if frame < time-frame + 1[
       ;show frame
-      ask player [
-        if want-up? [
-          ask patch ([pxcor] of player) (([pycor] of player) + 1) [
-            ifelse any? neighbors with [wall? = true] [
-            ] [
-              ask player [set heading 0]
-            ]
-          ]
-        ]
-        if want-down? [
-          ask patch ([pxcor] of player) (([pycor] of player) - 1) [
-            ifelse any? neighbors with [wall? = true] [
-            ] [
-              ask player [set heading 180]
-            ]
-          ]
-        ]
-        if want-right? [
-          ask patch (([pxcor] of player) + 1) ([pycor] of player) [
-            ifelse any? neighbors with [wall? = true] [
-            ] [
-              ask player [set heading 90]
-            ]
-          ]
-        ]
-        if want-left? [
-          ask patch (([pxcor] of player) - 1) ([pycor] of player) [
-            ifelse any? neighbors with [wall? = true] [
-            ] [
-              ask player [set heading 270]
-            ]
-          ]
-        ]
-        if [wall?] of patch-ahead 2 = false  and [player-wall?] of patch-ahead 3 = false[
-          fd speed
-          animate-pacman
-        ]
-      ]
+      move-player
       ; Waits for a ghost to be in the "frightened" state for a max of 8 seconds
       ; before becoming harmful again.
       ifelse timer - frightened-timer > 8 [
@@ -303,14 +266,9 @@ to move
         ]
       ]
 
-
       set frame frame + 1
     ]
     collisions
-    scatter
-    set frame frame + 1
-    collisions
-  ]
     ; Checks if the player has beaten the level (collected all pellets)
     if not any? pellets [
       next-level
@@ -326,28 +284,28 @@ end
 
 
 to scatter
-    force-center
-    if [intersection?] of patch-here = true and on-intersection? = false[
-      move-to one-of patches with [intersection? = true and distance myself < 1]
-      ;show "yoo"
-      set on-intersection? true
+  force-center
+  if [intersection?] of patch-here = true and on-intersection? = false[
+    move-to one-of patches with [intersection? = true and distance myself < 1]
+    ;show "yoo"
+    set on-intersection? true
+  ]
+  ifelse [wall?] of patch-ahead 2 = false[
+    fd speed
+    if [intersection?] of patches in-radius 1 = false or [intersection?] of patch-here = false[
+      set on-intersection? false
+      ;show "on intersection!"
     ]
-    ifelse [wall?] of patch-ahead 2 = false[
-      fd speed
-      if [intersection?] of patches in-radius 1 = false or [intersection?] of patch-here = false[
-        set on-intersection? false
-        ;show "on intersection!"
-      ]
-    ][
-      if [wall?] of patch-right-and-ahead 90 2 = false[
-        rt 90
-      ]
-      if [wall?] of patch-left-and-ahead 90 2 = false[
-        lt 90
-      ]
+  ][
+    if [wall?] of patch-right-and-ahead 90 2 = false[
+      rt 90
+    ]
+    if [wall?] of patch-left-and-ahead 90 2 = false[
+      lt 90
+    ]
 
-      set heading round heading
-    ]
+    set heading round heading
+  ]
 end
 
 
@@ -369,20 +327,6 @@ to roam
   ][
    fd speed
   ]
-end
-
-
-; Changed name to scatter since it's a default mode for all ghosts.
-; Just removed "ask pinky"
-to scatter
-  let patches-to-turn-toward (patch-set patch-ahead 2 patch-left-and-ahead 90 2 patch-right-and-ahead 90 2)
-  if [intersection?] of patch-here = true[face one-of patches-to-turn-toward with [wall? = false]]
-  ifelse [wall?] of patch-ahead 2 = false[
-    fd .75
-  ][
-    face one-of patches-to-turn-toward with [wall? = false]
-  ]
-
 end
 
 
@@ -535,6 +479,50 @@ to animate-pacman
   ]
 end
 
+
+to move-player
+  ask player [
+    force-center
+    if want-up? [
+      ask patch ([pxcor] of player) (([pycor] of player) + 1) [
+        ifelse any? neighbors with [wall? = true] [
+        ] [
+          ask player [set heading 0]
+        ]
+      ]
+    ]
+    if want-down? [
+      ask patch ([pxcor] of player) (([pycor] of player) - 1) [
+        ifelse any? neighbors with [wall? = true] [
+        ] [
+          ask player [set heading 180]
+        ]
+      ]
+    ]
+    if want-right? [
+      ask patch (([pxcor] of player) + 1) ([pycor] of player) [
+        ifelse any? neighbors with [wall? = true] [
+        ] [
+          ask player [set heading 90]
+        ]
+      ]
+    ]
+    if want-left? [
+      ask patch (([pxcor] of player) - 1) ([pycor] of player) [
+        ifelse any? neighbors with [wall? = true] [
+        ] [
+          ask player [set heading 270]
+        ]
+      ]
+    ]
+    if [wall?] of patch-ahead 2 = false  and [player-wall?] of patch-ahead 3 = false[
+      fd speed
+      animate-pacman
+    ]
+  ]
+
+end
+
 ; Code places pellets in blocked out areas. This deletes pellets you can't get.
 to kill-extra-pellets
   ask turtles with [ (ycor = 9)  and (xcor < -19) ] [ die ]
@@ -551,7 +539,6 @@ to set-big-pellets
   ask turtles with [ (ycor = -27)  and (xcor =  24) ] [ set size 2 ]
   ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 ]
 end
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
@@ -1092,7 +1079,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.1
+NetLogo 6.0.2
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
