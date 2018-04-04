@@ -51,7 +51,7 @@ ghosts-own [ boxed? frightened? time-eaten sight-range]
 
 to setup
   ca
-  set player-speed 0.15
+  set player-speed 0.22
   set enemy-speed player-speed + 0.05
   set wait? true
   set level-done? true
@@ -235,14 +235,10 @@ to move
           ]
         ]
       ]
-      ; Ghosts that are eaten only stay in the "eaten" state for a max of 5 seconds
-      ; before becoming harmful again.
+
+      ; Ghosts that are eaten move to their box and become active again
       ask ghosts with [shape = "eaten"] [
-        if timer - time-eaten > 5 [
-          set frightened? false
-          set shape "ghost"
-          set speed enemy-speed
-        ]
+        restart
       ]
 
       enemy-movement
@@ -296,7 +292,7 @@ end
 
 
 to enemy-movement
-  ask ghosts [
+  ask ghosts with [shape != "eaten"] [
     ifelse not boxed? [
       ; normal movement
       scatter
@@ -307,22 +303,27 @@ to enemy-movement
         ; Each ghost has a time given to them to wait until before they can roam (time-before-roam).
         ; Went that time has passed, they start roaming.
         ; It's a variable because the times will change as the player progresses through levels.
-        if timer - roam-timer >= time-before-roam [
+        ; The "self" check makes sure a ghost can't make another ghost move when they shouldn't
+        if (timer - roam-timer >= time-before-roam) and (self = clyde) [
           if [boxed?] of clyde = true[
             ask clyde [set heading 0 roam ]
           ]
         ]
 
-        if (timer - roam-timer) >= (time-before-roam * 2 ) [
+        if ((timer - roam-timer) >= (time-before-roam * 2 )) and (self = inky) [
           if [boxed?] of inky = true[
             ask inky [ set heading 270 roam if xcor < 0 [ move-to patch 0 3]]
           ]
         ]
 
-        if (timer - roam-timer) >= (time-before-roam * 3 ) [
+        if ((timer - roam-timer) >= (time-before-roam * 3 )) and (self = blinky) [
           if [boxed?] of blinky = true[
             ask blinky [ set heading 90 roam if xcor > 0 [ move-to patch 0 3]]
           ]
+        ]
+
+        if (self = pinky) [
+          ask pinky [roam]
         ]
       ]
     ]
@@ -349,6 +350,19 @@ to roam
   ]
 end
 
+to restart
+  face patch 0 3
+  set speed enemy-speed
+  fd speed
+  if (pxcor = 0 and pycor = 3) [
+    setxy 0 3
+    set heading 0
+    set boxed? true
+    set frightened? false
+    set shape "ghost"
+    ;set speed enemy-speed
+  ]
+end
 
 to collisions
   ; Anytime the score is increased, the player is asked to show it.
@@ -499,8 +513,8 @@ end
 ;animate Pac-man so that his mouth opens every other frame
 to animate-pacman
   ask player[
-    if time-frame mod 2 = 0 [set shape "pacman"]
-    if time-frame mod 2 = 1 [set shape "circle"]
+    if time-frame mod 4 = 0 [set shape "pacman"]
+    if time-frame mod 4 = 2 [set shape "circle"]
   ]
 end
 
@@ -593,9 +607,9 @@ ticks
 30.0
 
 BUTTON
-16
+17
 44
-79
+80
 77
 NIL
 setup
@@ -1089,7 +1103,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.2
+NetLogo 6.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
