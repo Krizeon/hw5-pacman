@@ -217,7 +217,7 @@ to move
   if lives < 0 [
     ask turtles [ die ]
     show score
-   stop
+    stop
   ]
 
 
