@@ -5,6 +5,8 @@
 globals[
   start-patch
   player
+  score
+  multiplier
   max-speed
   frame
   time-frame
@@ -14,7 +16,11 @@ globals[
   blinky ;red ghost
   pinky  ;pink ghost
   clyde  ;orange ghost
-  did-i-setup?
+  frightened-timer
+  roam-timer
+  time-before-roam
+  wait?
+  level-done?
 ]
 
 patches-own [
@@ -26,6 +32,7 @@ patches-own [
 ]
 
 breed [ ghosts ghost ]
+breed [ pellets pellet ]
 
 turtles-own [
   on-intersection?
@@ -36,9 +43,17 @@ turtles-own [
   want-right?
 ]
 
+ghosts-own [ boxed? frightened? time-eaten ]
+
 to setup
   ca
+  set wait? true
+  set level-done? true
+  set score 0
+  set multiplier 200
   setup-patches
+  set roam-timer 0
+  set time-before-roam 10
   create-turtles 1 [
     set size 3
     setxy 0 -15
@@ -59,6 +74,8 @@ to setup
     set shape "ghost"
     set blinky self
     turn-setup
+    set boxed? true
+    set frightened? false
   ]
 
   create-ghosts 1 [
@@ -71,22 +88,41 @@ to setup
     set speed 0.4
     set on-intersection? false
     turn-setup
+    set boxed? false
+    set frightened? false
   ]
 
   create-ghosts 1 [
     set size 4
     setxy 3 3
-    set color blue + 1
+    set color blue + 1.5
     set heading 0
     set shape "ghost"
     set inky self
     turn-setup
+    set boxed? true
+    set frightened? false
   ]
+
+  create-ghosts 1 [
+    set size 4
+    setxy 0 3
+    set color 25
+    set heading 0
+    set shape "ghost"
+    set clyde self
+    turn-setup
+    set boxed? true
+    set frightened? false
+  ]
+
+  reset-ticks
   reset-timer
   set frame 0
   set time-frame 0
   set framerate 60
   setup-pellets
+
 end
 
 to setup-pellets
@@ -109,13 +145,13 @@ to setup-pellets
       ;4
       with [ (pxcor mod 3 = 0) and (pycor mod 3 = 0) ]
     )
-
-    create-turtles 1 [
-      set size .5
-      set pellet? true
-      set shape "circle"
-      set color white
-      setxy ([pxcor] of good-loc) ([pycor] of good-loc)
+    if good-loc != nobody [
+      create-pellets 1 [
+        set size .5
+        set shape "circle"
+        set color white
+        setxy ([pxcor] of good-loc) ([pycor] of good-loc)
+      ]
     ]
   ]
   ; it was difficult to restrict the program from creating pellets in the small 4 areas where the player cannot go to with making the code really messy.
@@ -146,10 +182,12 @@ to setup-patches
   ; determine all the intersections of the maze
   ask patches with [wall? = false  and (pxcor mod 3 = 0) and (pycor mod 3 = 0)][
     if count (patches in-radius 3 with [wall? = true]) = 4 or count (patches in-radius 2 with [wall? = true]) = 1 [
-      set pcolor green
+      ;set pcolor green       ;Used to see the main intersections that the ghosts randomly choose paths from
       set intersection? true
     ]
   ]
+
+  ; makes sure that the patches above the pink barrier are viewed as a wall by the player
   ask patch 0 9 [ set intersection? false set pcolor black]
   ask patch 0 3 [ set intersection? false set pcolor black]
   ask patch -1 7 [ set player-wall? true ]
@@ -160,52 +198,134 @@ end
 
 
 to move
-  set time-frame round (timer * framerate)
-  if frame < time-frame + 1[
-    ask player [
-      force-center
-      if want-up? [
-        ask patch ([pxcor] of player) (([pycor] of player) + 1) [
-          if not any? neighbors with [wall? = true] [
-            ask player [set heading 0]
+  if not wait? [
+    set time-frame round (timer * framerate)
+    if frame < time-frame + 1[
+      ;show frame
+      ask player [
+        if want-up? [
+          ask patch ([pxcor] of player) (([pycor] of player) + 1) [
+            ifelse any? neighbors with [wall? = true] [
+            ] [
+              ask player [set heading 0]
+            ]
+          ]
+        ]
+        if want-down? [
+          ask patch ([pxcor] of player) (([pycor] of player) - 1) [
+            ifelse any? neighbors with [wall? = true] [
+            ] [
+              ask player [set heading 180]
+            ]
+          ]
+        ]
+        if want-right? [
+          ask patch (([pxcor] of player) + 1) ([pycor] of player) [
+            ifelse any? neighbors with [wall? = true] [
+            ] [
+              ask player [set heading 90]
+            ]
+          ]
+        ]
+        if want-left? [
+          ask patch (([pxcor] of player) - 1) ([pycor] of player) [
+            ifelse any? neighbors with [wall? = true] [
+            ] [
+              ask player [set heading 270]
+            ]
+          ]
+        ]
+        if [wall?] of patch-ahead 2 = false  and [player-wall?] of patch-ahead 3 = false[
+          fd speed
+          animate-pacman
+        ]
+      ]
+      ; Waits for a ghost to be in the "frightened" state for a max of 8 seconds
+      ; before becoming harmful again.
+      ifelse timer - frightened-timer > 8 [
+        ask ghosts with [shape != "eaten"] [
+          set shape "ghost"
+          set frightened? false
+        ]
+      ][
+        ; Makes ghosts  that are frightened flash for the last 3 seconds before
+        ; they return to normal
+        ask ghosts with [frightened? and shape != "eaten"] [
+          if (timer - frightened-timer) > 5 and (timer - frightened-timer) < 6  [
+            set shape "flashing frightened"
+          ]
+          if (timer - frightened-timer) > 6 and (timer - frightened-timer) < 7 [
+            set shape "frightened"
+          ]
+          if (timer - frightened-timer) > 7 and (timer - frightened-timer) < 8 [
+            set shape "flashing frightened"
           ]
         ]
       ]
-      if want-down? [
-        ask patch ([pxcor] of player) (([pycor] of player) - 1) [
-          if not any? neighbors with [wall? = true] [
-            ask player [set heading 180]
+      ; Ghosts that are eaten only stay in the "eaten" state for a max of 5 seconds
+      ; before becoming harmful again.
+      ask ghosts with [shape = "eaten"] [
+        if timer - time-eaten > 5 [
+          set frightened? false
+          set shape "ghost"
+        ]
+      ]
+
+      ask ghosts [
+        ifelse not boxed? [
+          ; normal movement
+          scatter
+        ][
+          ; Otherwise slowly frees the ghosts until they've all started roaming
+          ; but they won't leave if they're frightened.
+          if not frightened? [
+            ; Each ghost has a time given to them to wait until before they can roam (time-before-roam).
+            ; Went that time has passed, they start roaming.
+            ; It's a variable because the times will change as the player progresses through levels.
+            if timer - roam-timer >= time-before-roam [
+              if [boxed?] of clyde = true[
+                ask clyde [set heading 0 roam ]
+              ]
+            ]
+
+            if (timer - roam-timer) >= (time-before-roam * 2 ) [
+              if [boxed?] of inky = true[
+                ask inky [ set heading 270 roam ]
+              ]
+            ]
+
+            if (timer - roam-timer) >= (time-before-roam * 3 ) [
+              if [boxed?] of blinky = true[
+                ask blinky [ set heading 90 roam ]
+              ]
+            ]
           ]
         ]
       ]
-      if want-right? [
-        ask patch (([pxcor] of player) + 1) ([pycor] of player) [
-          if not any? neighbors with [wall? = true][
-            ask player [set heading 90]
-          ]
-        ]
-      ]
-      if want-left? [
-        ask patch (([pxcor] of player) - 1) ([pycor] of player) [
-          if not any? neighbors with [wall? = true] [
-            ask player [set heading 270]
-          ]
-        ]
-      ]
-      if [wall?] of patch-ahead 2 = false  and [player-wall?] of patch-ahead 3 = false [
-        fd speed
-        animate-pacman
-      ]
+
+
+      set frame frame + 1
     ]
-    enemy-movement
+    collisions
+    scatter
     set frame frame + 1
     collisions
+  ]
+    ; Checks if the player has beaten the level (collected all pellets)
+    if not any? pellets [
+      next-level
+    ]
+  ]
+
+  if timer > 3 and level-done? [
+   set wait? false
+    set level-done? false
+    reset-timer
   ]
 end
 
 
-to enemy-movement
-  ask pinky[
+to scatter
     force-center
     if [intersection?] of patch-here = true and on-intersection? = false[
       move-to one-of patches with [intersection? = true and distance myself < 1]
@@ -228,20 +348,136 @@ to enemy-movement
 
       set heading round heading
     ]
+end
+
+
+
+to roam
+  ; First checks if the ghost is in the middle of their prison so they can leave it.
+  ; If not, moves them towards it.
+  ; If so, then checks if they're out of the box.
+  ;        If not, makes them move upwards until they are.
+  ifelse xcor = 0 [
+    ifelse ycor >= 9 [
+      setxy 0 9            ; just to be sure that the ghost is centered precisely.
+      set boxed? false
+    ][
+      set heading 0
+      fd speed
+
+    ]
+  ][
+   fd speed
+  ]
+end
+
+
+; Changed name to scatter since it's a default mode for all ghosts.
+; Just removed "ask pinky"
+to scatter
+  let patches-to-turn-toward (patch-set patch-ahead 2 patch-left-and-ahead 90 2 patch-right-and-ahead 90 2)
+  if [intersection?] of patch-here = true[face one-of patches-to-turn-toward with [wall? = false]]
+  ifelse [wall?] of patch-ahead 2 = false[
+    fd .75
+  ][
+    face one-of patches-to-turn-toward with [wall? = false]
   ]
 
 end
 
 
 to collisions
-  ask turtles with [pellet? = true] [
+  ; Anytime the score is increased, the player is asked to show it.
+
+  ; If the player is close enough, the pellet gets eaten and gives points.
+  ask pellets [
    if distance player <= 1 [
-     die
+      ifelse size = 2 [
+
+        ; If the eaten pellet is a big one, also enable frightened mode
+        set score (score + 50)
+        frightened-mode
+      ][
+        set score (score + 10)
+      ]
+      ask player [show score]
+      die
+    ]
+  ]
+
+
+  ask ghosts [
+   ifelse frightened? = false[
+     if distance player < 1 [
+       ;kill-player
+      ]
+    ][
+      if (distance player < 1.25) and (shape != "eaten") [
+        ; There's a score multiplier that increases with each
+        ; eaten ghost within the timeframe of frightened mode
+        set score (score + multiplier)
+        if multiplier < 1600[
+          set multiplier (multiplier * 2)
+        ]
+        ask player [show score]
+        get-eaten
+
+      ]
     ]
   ]
 end
 
-; player turns up
+to get-eaten
+  set time-eaten timer
+  set shape "eaten"
+
+end
+
+to next-level
+
+  set multiplier 200
+  set roam-timer 0
+  set level-done? true
+  set wait? true
+
+  if time-before-roam > 3 [
+    set time-before-roam (time-before-roam * 0.8)
+  ]
+
+  ask player [ setxy 0 -15 ]
+  ask pinky  [ setxy 0 9 set frightened? false set shape "ghost" set heading 0 ]
+  ask blinky [ setxy -3 3 set frightened? false set boxed? true set shape "ghost" set heading 0 ]
+  ask inky   [ setxy 3 3 set frightened? false set boxed? true set shape "ghost" set heading 0 ]
+  ask clyde  [ setxy 0 3 set frightened? false set boxed? true set shape "ghost" set heading 0 ]
+
+
+  reset-ticks
+  reset-timer
+  set frame 0
+  set time-frame 0
+  set framerate 20
+  setup-pellets
+end
+
+to kill-player
+  ask player [ die ]
+end
+
+to frightened-mode
+  set frightened-timer timer
+  if not any? ghosts with [shape = "frightened"] [
+   set multiplier 200
+  ]
+  ask ghosts with [shape != "eaten"] [
+    set shape "frightened"
+    set frightened? true
+  ]
+end
+
+
+
+
+; Next 4 funtions change the direction the agent will turn at the next intersection
 to turn-up
   set want-up? true
   set want-down? false
@@ -249,8 +485,6 @@ to turn-up
   set want-right? false
 end
 
-
-;player turns right
 to turn-right
   set want-up? false
   set want-down? false
@@ -258,8 +492,6 @@ to turn-right
   set want-right? true
 end
 
-
-;player turns dowwn
 to turn-down
   set want-up? false
   set want-down? true
@@ -267,8 +499,6 @@ to turn-down
   set want-right? false
 end
 
-
-;player turns left
 to turn-left
   set want-up? false
   set want-down? false
@@ -276,6 +506,7 @@ to turn-left
   set want-right? false
 end
 
+; No turn request given at the start. Player chooses.
 to turn-setup
   set want-up? false
   set want-down? false
@@ -304,6 +535,7 @@ to animate-pacman
   ]
 end
 
+; Code places pellets in blocked out areas. This deletes pellets you can't get.
 to kill-extra-pellets
   ask turtles with [ (ycor = 9)  and (xcor < -19) ] [ die ]
   ask turtles with [ (ycor = 9)  and (xcor >  19) ] [ die ]
@@ -312,6 +544,7 @@ to kill-extra-pellets
   ask turtles with [ (ycor = -3) and (xcor =   0) ] [ die ]
 end
 
+; Sets up the power pellets
 to set-big-pellets
   ask turtles with [ (ycor =  27)  and (xcor = -24) ] [ set size 2 ]
   ask turtles with [ (ycor = -27)  and (xcor = -24) ] [ set size 2 ]
@@ -552,6 +785,15 @@ false
 0
 Circle -7500403 true true 90 90 120
 
+eaten
+false
+0
+Rectangle -16777216 true false 120 225 210 225
+Circle -1 true false 86 86 67
+Circle -1 true false 161 86 67
+Circle -13345367 true false 193 118 32
+Circle -13345367 true false 118 118 32
+
 face happy
 false
 0
@@ -593,6 +835,23 @@ Polygon -7500403 true true 90 150 270 90 90 30
 Line -7500403 true 75 135 90 135
 Line -7500403 true 75 45 90 45
 
+flashing frightened
+false
+0
+Rectangle -1 true false 60 120 240 225
+Circle -1 true false 63 33 175
+Rectangle -16777216 true false 120 225 210 225
+Polygon -1 true false 60 210 60 255 90 225 120 255 150 225 180 255 210 225 240 255 240 210 60 210
+Rectangle -13345367 true false 105 105 135 135
+Rectangle -13345367 true false 165 105 195 135
+Rectangle -13345367 true false 90 180 105 195
+Rectangle -13345367 true false 135 180 165 195
+Rectangle -13345367 true false 195 180 210 195
+Rectangle -13345367 true false 165 195 195 210
+Rectangle -13345367 true false 105 195 135 210
+Rectangle -13345367 true false 210 195 225 210
+Rectangle -13345367 true false 75 195 90 210
+
 flower
 false
 0
@@ -609,6 +868,23 @@ Circle -7500403 true true 96 51 108
 Circle -16777216 true false 113 68 74
 Polygon -10899396 true false 189 233 219 188 249 173 279 188 234 218
 Polygon -10899396 true false 180 255 150 210 105 210 75 240 135 240
+
+frightened
+false
+0
+Rectangle -13345367 true false 60 120 240 225
+Circle -13345367 true false 63 33 175
+Rectangle -16777216 true false 120 225 210 225
+Polygon -13345367 true false 60 210 60 255 90 225 120 255 150 225 180 255 210 225 240 255 240 210 60 210
+Rectangle -1 true false 105 105 135 135
+Rectangle -1 true false 165 105 195 135
+Rectangle -1 true false 90 180 105 195
+Rectangle -1 true false 135 180 165 195
+Rectangle -1 true false 195 180 210 195
+Rectangle -1 true false 165 195 195 210
+Rectangle -1 true false 105 195 135 210
+Rectangle -1 true false 210 195 225 210
+Rectangle -1 true false 75 195 90 210
 
 ghost
 false
@@ -655,7 +931,7 @@ pacman
 true
 0
 Circle -7500403 true true 0 0 300
-Polygon -16777216 true false 45 45 150 150 240 30 195 0 105 0 45 30 45 45
+Polygon -16777216 true false 45 45 150 150 255 30 195 0 105 0 45 30 45 45
 
 pentagon
 false
@@ -816,7 +1092,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.2
+NetLogo 6.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
