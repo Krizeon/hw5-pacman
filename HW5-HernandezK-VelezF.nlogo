@@ -283,7 +283,6 @@ to move
     stop
   ]
   if not wait? [
-    show timer
     if timer > 3[
       if not any? fruits and not fruit-placed?[
         place-fruit
@@ -479,7 +478,6 @@ to collisions
       ][
         set score (score + 10)
       ]
-      ask player [show score]
       die
     ]
   ]
@@ -506,7 +504,6 @@ to collisions
         if multiplier < 1600[
           set multiplier (multiplier * 2)
         ]
-        ask player [show score]
         get-eaten
 
       ]
@@ -883,7 +880,7 @@ NIL
 1
 
 @#$#@#$#@
-## Kevin Hernandez, Felix Velez
+## Kevin Hernandez, Felix Velez HW5: Pac-Man!
 
 ## HOW TO PLAY
 
