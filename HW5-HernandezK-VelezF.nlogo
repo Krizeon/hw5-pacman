@@ -37,7 +37,7 @@ turtles-own [
   want-right?
 ]
 
-ghosts-own [ ]
+ghosts-own [speed]
 
 to setup
   ca
@@ -71,7 +71,8 @@ to setup
     set heading 0
     set shape "ghost"
     set pinky self
-    set speed 0.2
+    set speed 0.1
+    set on-intersection? false
     turn-setup
   ]
 
@@ -145,6 +146,7 @@ to setup-patches
       ]
     ]
   ]
+  ; determine all the intersections of the maze
   ask patches with [wall? = false  and (pxcor mod 3 = 0) and (pycor mod 3 = 0)][
     if count (patches in-radius 3 with [wall? = true]) = 4 or count (patches in-radius 2 with [wall? = true]) = 1 [
       set pcolor green
@@ -163,7 +165,6 @@ end
 to move
   set time-frame round (timer * framerate)
   if frame < time-frame + 1[
-    ;show frame
     ask player [
       force-center
       if want-up? [
@@ -195,13 +196,6 @@ to move
         ]
       ]
       if [wall?] of patch-ahead 2 = false  and [player-wall?] of patch-ahead 3 = false [
-;        if [intersection?] of patch-ahead speed and on-intersection? = false[
-;          move-to patch-ahead speed
-;          set on-intersection? true
-;        ]
-;        if [intersection?] of patch-here = false[
-;          set on-intersection? false
-;        ]
         fd speed
         animate-pacman
       ]
@@ -216,12 +210,26 @@ end
 to enemy-movement
   ask pinky[
     force-center
-    let patches-to-turn-toward (patch-set patch-ahead 2 patch-left-and-ahead 90 2 patch-right-and-ahead 90 2)
-    if [intersection?] of patch-here = true[face one-of patches-to-turn-toward with [wall? = false]]
+    if [intersection?] of patch-here = true and on-intersection? = false[
+      move-to one-of patches with [intersection? = true and distance myself < 1]
+      ;show "yoo"
+      set on-intersection? true
+    ]
     ifelse [wall?] of patch-ahead 2 = false[
       fd speed
+      if [intersection?] of patches in-radius 1 = false or [intersection?] of patch-here = false[
+        set on-intersection? false
+        ;show "on intersection!"
+      ]
     ][
-      face one-of patches-to-turn-toward with [wall? = false]
+      if [wall?] of patch-right-and-ahead 90 2 = false[
+        rt 90
+      ]
+      if [wall?] of patch-left-and-ahead 90 2 = false[
+        lt 90
+      ]
+
+      set heading round heading
     ]
   ]
 
@@ -364,8 +372,8 @@ BUTTON
 106
 97
 139
-play game
-if did-i-setup?[\n  set did-i-setup? true\n  setup\n]\nmove
+move
+move
 T
 1
 T
