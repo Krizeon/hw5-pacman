@@ -33,6 +33,7 @@ patches-own [
   intersection?
 ]
 
+
 breed [ ghosts ghost ]
 breed [ pellets pellet ]
 
@@ -46,7 +47,7 @@ turtles-own [
   speed
 ]
 
-ghosts-own [ boxed? frightened? time-eaten ]
+ghosts-own [ boxed? frightened? time-eaten sight-range]
 
 to setup
   ca
@@ -216,6 +217,7 @@ to move
       ifelse timer - frightened-timer > 8 [
         ask ghosts with [shape != "eaten"] [
           set shape "ghost"
+          set speed enemy-speed
           set frightened? false
         ]
       ][
@@ -239,40 +241,11 @@ to move
         if timer - time-eaten > 5 [
           set frightened? false
           set shape "ghost"
+          set speed enemy-speed
         ]
       ]
 
-      ask ghosts [
-        ifelse not boxed? [
-          ; normal movement
-          scatter
-        ][
-          ; Otherwise slowly frees the ghosts until they've all started roaming
-          ; but they won't leave if they're frightened.
-          if not frightened? [
-            ; Each ghost has a time given to them to wait until before they can roam (time-before-roam).
-            ; Went that time has passed, they start roaming.
-            ; It's a variable because the times will change as the player progresses through levels.
-            if timer - roam-timer >= time-before-roam [
-              if [boxed?] of clyde = true[
-                ask clyde [set heading 0 roam ]
-              ]
-            ]
-
-            if (timer - roam-timer) >= (time-before-roam * 2 ) [
-              if [boxed?] of inky = true[
-                ask inky [ set heading 270 roam if xcor < 0 [ move-to patch 0 3]]
-              ]
-            ]
-
-            if (timer - roam-timer) >= (time-before-roam * 3 ) [
-              if [boxed?] of blinky = true[
-                ask blinky [ set heading 90 roam if xcor > 0 [ move-to patch 0 3]]
-              ]
-            ]
-          ]
-        ]
-      ]
+      enemy-movement
 
       set frame frame + 1
     ]
@@ -282,6 +255,7 @@ to move
       next-level
     ]
   ]
+
 
   if timer > 2 and level-done? [
    set wait? false
@@ -321,6 +295,40 @@ to scatter
 end
 
 
+to enemy-movement
+  ask ghosts [
+    ifelse not boxed? [
+      ; normal movement
+      scatter
+    ][
+      ; Otherwise slowly frees the ghosts until they've all started roaming
+      ; but they won't leave if they're frightened.
+      if not frightened? [
+        ; Each ghost has a time given to them to wait until before they can roam (time-before-roam).
+        ; Went that time has passed, they start roaming.
+        ; It's a variable because the times will change as the player progresses through levels.
+        if timer - roam-timer >= time-before-roam [
+          if [boxed?] of clyde = true[
+            ask clyde [set heading 0 roam ]
+          ]
+        ]
+
+        if (timer - roam-timer) >= (time-before-roam * 2 ) [
+          if [boxed?] of inky = true[
+            ask inky [ set heading 270 roam if xcor < 0 [ move-to patch 0 3]]
+          ]
+        ]
+
+        if (timer - roam-timer) >= (time-before-roam * 3 ) [
+          if [boxed?] of blinky = true[
+            ask blinky [ set heading 90 roam if xcor > 0 [ move-to patch 0 3]]
+          ]
+        ]
+      ]
+    ]
+  ]
+end
+
 
 to roam
   ; First checks if the ghost is in the middle of their prison so they can leave it.
@@ -352,7 +360,7 @@ to collisions
 
         ; If the eaten pellet is a big one, also enable frightened mode
         set score (score + 50)
-        frightened-mode
+        ask ghosts with [shape != "eaten"] [frightened-mode]
       ][
         set score (score + 10)
       ]
@@ -415,12 +423,17 @@ to next-level
   setup-pellets
 end
 
+
 to kill-player
   ask player [ die ]
 end
 
+
 to frightened-mode
   set frightened-timer timer
+  show speed
+  set speed (speed * 0.5)
+  show speed
   if not any? ghosts with [shape = "frightened"] [
    set multiplier 200
   ]
