@@ -6,7 +6,7 @@ globals[
   start-patch
   player
   score
-  combo
+  multiplier
   max-speed
   frame
   time-frame
@@ -16,9 +16,9 @@ globals[
   blinky ;red ghost
   pinky  ;pink ghost
   clyde  ;orange ghost
-  scared-timer
-  unbox-timer
-  time-before-unbox
+  frightened-timer
+  roam-timer
+  time-before-roam
 ]
 
 patches-own [
@@ -40,15 +40,15 @@ turtles-own [
   want-right?
 ]
 
-ghosts-own [ boxed? vulnerable? time-eyes ]
+ghosts-own [ boxed? frightened? time-eaten ]
 
 to setup
   ca
   set score 0
-  set combo 1
+  set multiplier 1
   setup-patches
-  set unbox-timer 0
-  set time-before-unbox 10
+  set roam-timer 0
+  set time-before-roam 10
   create-turtles 1 [
     set size 3
     setxy 0 -15
@@ -69,7 +69,7 @@ to setup
     set blinky self
     turn-setup
     set boxed? true
-    set vulnerable? false
+    set frightened? false
   ]
 
   create-ghosts 1 [
@@ -81,7 +81,7 @@ to setup
     set pinky self
     turn-setup
     set boxed? false
-    set vulnerable? false
+    set frightened? false
   ]
 
   create-ghosts 1 [
@@ -93,7 +93,7 @@ to setup
     set inky self
     turn-setup
     set boxed? true
-    set vulnerable? false
+    set frightened? false
   ]
 
   create-ghosts 1 [
@@ -105,7 +105,7 @@ to setup
     set clyde self
     turn-setup
     set boxed? true
-    set vulnerable? false
+    set frightened? false
   ]
 
   reset-ticks
@@ -228,85 +228,99 @@ to move
         animate-pacman
       ]
     ]
-    ifelse timer - scared-timer > 8 [
-      ask ghosts with [shape != "eyes"] [
+
+    ; Waits for a ghost to be in the "frightened" state for a max of 8 seconds
+    ; before becoming harmful again.
+    ifelse timer - frightened-timer > 8 [
+      ask ghosts with [shape != "eaten"] [
         set shape "ghost"
-        set vulnerable? false
+        set frightened? false
       ]
     ][
-      ask ghosts with [vulnerable? and shape != "eyes"] [
-        if (timer - scared-timer) > 5 and (timer - scared-timer) < 6  [
-          set shape "flashing scared"
+      ; Makes ghosts  that are frightened flash for the last 3 seconds before
+      ; they return to normal
+      ask ghosts with [frightened? and shape != "eaten"] [
+        if (timer - frightened-timer) > 5 and (timer - frightened-timer) < 6  [
+          set shape "flashing frightened"
         ]
-        if (timer - scared-timer) > 6 and (timer - scared-timer) < 7 [
-          set shape "scared"
+        if (timer - frightened-timer) > 6 and (timer - frightened-timer) < 7 [
+          set shape "frightened"
         ]
-        if (timer - scared-timer) > 7 and (timer - scared-timer) < 8 [
-          set shape "flashing scared"
+        if (timer - frightened-timer) > 7 and (timer - frightened-timer) < 8 [
+          set shape "flashing frightened"
         ]
       ]
     ]
-    ask ghosts with [shape = "eyes"] [
-      if timer - time-eyes > 5 [
-        set vulnerable? false
+    ; Ghosts that are eaten only stay in the "eaten" state for a max of 5 seconds
+    ; before becoming harmful again.
+    ask ghosts with [shape = "eaten"] [
+      if timer - time-eaten > 5 [
+        set frightened? false
         set shape "ghost"
       ]
     ]
-    ask ghosts with [not boxed?] [scatter]
 
+    ask ghosts [
+      ifelse not boxed? [
+        ; normal movement
+        scatter
+      ][
+        ; Otherwise slowly frees the ghosts until they've all started roaming
+        ; but they won't leave if they're frightened.
+        if not frightened? [
+          ; Each ghost has a time given to them to wait until before they can roam (time-before-roam).
+          ; Went that time has passed, they start roaming.
+          ; It's a variable because the times will change as the player progresses through levels.
+          if timer - roam-timer >= time-before-roam [
+            if [boxed?] of clyde = true[
+              ask clyde [set heading 0 roam ]
+            ]
+          ]
 
-    ; slowly frees the ghosts until they've all started roaming
-    if any? ghosts with [boxed? and not vulnerable?] [
-      if timer - unbox-timer >= time-before-unbox [
-        if [boxed?] of clyde = true[
-          ask clyde [ unbox ]
+          if (timer - roam-timer) >= (time-before-roam * 2 ) [
+            if [boxed?] of inky = true[
+              ask inky [ set heading 270 roam ]
+            ]
+          ]
+
+          if (timer - roam-timer) >= (time-before-roam * 3 ) [
+            if [boxed?] of blinky = true[
+              ask blinky [ set heading 90 roam ]
+            ]
+          ]
         ]
       ]
-
-      if (timer - unbox-timer) >= (time-before-unbox * 2 ) [
-        if [boxed?] of inky = true[
-          ask inky [ unbox ]
-        ]
-      ]
-
-      if (timer - unbox-timer) >= (time-before-unbox * 3 ) [
-        if [boxed?] of blinky = true[
-          ask blinky [ unbox ]
-        ]
-      ]
-
     ]
+
 
     set frame frame + 1
   ]
-  show timer
   collisions
 
 end
 
 
-
-to unbox
-  if xcor < 0 [
-   set heading 90
-   fd 0.75
-  ]
-  if xcor > 0 [
-   set heading 270
-   fd 0.75
-  ]
-  if xcor = 0 [
+to roam
+  ; First checks if the ghost is in the middle of their prison so they can leave it.
+  ; If not, moves them towards it.
+  ; If so, then checks if they're out of the box.
+  ;        If not, makes them move upwards until they are.
+  ifelse xcor = 0 [
     ifelse ycor >= 9 [
-      setxy 0 9
+      setxy 0 9            ; just to be sure that the ghost is centered precisely.
       set boxed? false
     ][
       set heading 0
       fd 0.75
     ]
+  ][
+   fd 0.75
   ]
 end
 
 
+; Changed name to scatter since it's a default mode for all ghosts.
+; Just removed "ask pinky"
 to scatter
   let patches-to-turn-toward (patch-set patch-ahead 2 patch-left-and-ahead 90 2 patch-right-and-ahead 90 2)
   if [intersection?] of patch-here = true[face one-of patches-to-turn-toward with [wall? = false]]
@@ -320,30 +334,39 @@ end
 
 
 to collisions
+  ; Anytime the score is increased, the player is asked to show it.
+
+  ; If the player is close enough, the pellet gets eaten and gives points.
   ask turtles with [pellet? = true] [
    if distance player <= 1 [
       ifelse size = 2 [
+
+        ; If the eaten pellet is a big one, also enable frightened mode
         set score (score + 50)
         frightened-mode
       ][
         set score (score + 10)
       ]
-      show score
+      ask player [show score]
       die
     ]
   ]
+
+
   ask ghosts [
-   ifelse vulnerable? = false[
+   ifelse frightened? = false[
      if distance player < 1 [
        ;kill-player
       ]
     ][
-      if (distance player < 1.25) and (shape != "eyes") [
-        set score (score + (200 * combo))
-        if combo < 4[
-          set combo (combo + 1)
+      if (distance player < 1.25) and (shape != "eaten") [
+        ; There's a score multiplier that increases with each
+        ; eaten ghost within the timeframe of frightened mode
+        set score (score + multiplier)
+        if multiplier < 1600[
+          set multiplier (multiplier * 2)
         ]
-        show score
+        ask player [show score]
         get-eaten
 
       ]
@@ -352,8 +375,8 @@ to collisions
 end
 
 to get-eaten
-  set time-eyes timer
-  set shape "eyes"
+  set time-eaten timer
+  set shape "eaten"
 
 end
 
@@ -362,13 +385,13 @@ to kill-player
 end
 
 to frightened-mode
-  set scared-timer timer
-  if not any? ghosts with [shape = "scared"] [
-   set combo 1
+  set frightened-timer timer
+  if not any? ghosts with [shape = "frightened"] [
+   set multiplier 200
   ]
-  ask ghosts with [shape != "eyes"] [
-    set shape "scared"
-    set vulnerable? true
+  ask ghosts with [shape != "eaten"] [
+    set shape "frightened"
+    set frightened? true
   ]
 end
 
@@ -438,7 +461,6 @@ to set-big-pellets
   ask turtles with [ (ycor = -27)  and (xcor =  24) ] [ set size 2 ]
   ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 ]
 end
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
@@ -690,7 +712,7 @@ false
 0
 Circle -7500403 true true 90 90 120
 
-eyes
+eaten
 false
 0
 Rectangle -16777216 true false 120 225 210 225
@@ -740,7 +762,7 @@ Polygon -7500403 true true 90 150 270 90 90 30
 Line -7500403 true 75 135 90 135
 Line -7500403 true 75 45 90 45
 
-flashing scared
+flashing frightened
 false
 0
 Rectangle -1 true false 60 120 240 225
@@ -773,6 +795,23 @@ Circle -7500403 true true 96 51 108
 Circle -16777216 true false 113 68 74
 Polygon -10899396 true false 189 233 219 188 249 173 279 188 234 218
 Polygon -10899396 true false 180 255 150 210 105 210 75 240 135 240
+
+frightened
+false
+0
+Rectangle -13345367 true false 60 120 240 225
+Circle -13345367 true false 63 33 175
+Rectangle -16777216 true false 120 225 210 225
+Polygon -13345367 true false 60 210 60 255 90 225 120 255 150 225 180 255 210 225 240 255 240 210 60 210
+Rectangle -1 true false 105 105 135 135
+Rectangle -1 true false 165 105 195 135
+Rectangle -1 true false 90 180 105 195
+Rectangle -1 true false 135 180 165 195
+Rectangle -1 true false 195 180 210 195
+Rectangle -1 true false 165 195 195 210
+Rectangle -1 true false 105 195 135 210
+Rectangle -1 true false 210 195 225 210
+Rectangle -1 true false 75 195 90 210
 
 ghost
 false
@@ -846,23 +885,6 @@ Polygon -7500403 true true 165 180 165 210 225 180 255 120 210 135
 Polygon -7500403 true true 135 105 90 60 45 45 75 105 135 135
 Polygon -7500403 true true 165 105 165 135 225 105 255 45 210 60
 Polygon -7500403 true true 135 90 120 45 150 15 180 45 165 90
-
-scared
-false
-0
-Rectangle -13345367 true false 60 120 240 225
-Circle -13345367 true false 63 33 175
-Rectangle -16777216 true false 120 225 210 225
-Polygon -13345367 true false 60 210 60 255 90 225 120 255 150 225 180 255 210 225 240 255 240 210 60 210
-Rectangle -1 true false 105 105 135 135
-Rectangle -1 true false 165 105 195 135
-Rectangle -1 true false 90 180 105 195
-Rectangle -1 true false 135 180 165 195
-Rectangle -1 true false 195 180 210 195
-Rectangle -1 true false 165 195 195 210
-Rectangle -1 true false 105 195 135 210
-Rectangle -1 true false 210 195 225 210
-Rectangle -1 true false 75 195 90 210
 
 sheep
 false
