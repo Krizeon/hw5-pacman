@@ -56,7 +56,6 @@ turtles-own [
 ghosts-own [
   boxed? ; true if ghost is within the ghost prison, false otherwise
   frightened? ;true if ghost is in frightened mode, false otherwise
-  time-eaten
   sight-range ; the range of sight in patches, varies by each ghost
 ]
 
@@ -93,7 +92,7 @@ to setup
     set speed player-speed
   ]
 
-  ;create red ghost
+  ;create Blinky, the red ghost
   create-ghosts 1 [
     set size 4
     setxy -3 3
@@ -108,7 +107,7 @@ to setup
     set sight-range 18 ;longest range of sight
   ]
 
-  ; create pink ghost
+  ; create Pinky, the pink ghost
   create-ghosts 1 [
     set size 4
     setxy 0 9
@@ -124,7 +123,7 @@ to setup
     set sight-range 12
   ]
 
-  ; create blue ghost
+  ; create Inky, the blue ghost
   create-ghosts 1 [
     set size 4
     setxy 3 3
@@ -139,7 +138,7 @@ to setup
     set sight-range 12
   ]
 
-  ; create orange ghost
+  ; create Clyde, the orange ghost
   create-ghosts 1 [
     set size 4
     setxy 0 3
@@ -176,7 +175,7 @@ to place-fruit
   ]
 end
 
-
+; Visually displays player's lives at the bottom of the screen
 to setup-lives
   set lives-patch (patch -20 -30)
   ask lives-patch  [set plabel "LIVES: "]
@@ -267,8 +266,16 @@ to setup-patches
 
 end
 
+; Core of the game.
+; Each time the player begins a round (whether they die or complete the level)
+;    the program sets wait? to be true. While it's true, this function will not move the agents
+;    for the first 2 seconds so that the player isn't immediately thrown into the game.
+; It always first checks how many lives the player has because if the player has no lives,
+;    then the game is over and it calls 'stop'
+;
 
 to move
+  ; Before the round starts, displays "READY?"
   ifelse wait? [
     ask patch 3 -6 [ set plabel-color yellow set plabel "READY?"]
   ][
@@ -276,12 +283,18 @@ to move
   ]
 
   ask score-patch [set plabel word "SCORE: " score] ;update the score constantly
+
+
+  ; Runs this if statement only when the player has no lives left.
+  ; This stops the game completely.
   if lives < 0 [
     ask turtles [ die ]
     ask patch 4 -6 [ set plabel-color yellow set plabel "GAME OVER"]
     show score
     stop
   ]
+
+  ; Runs everything in this if statement if the round has started
   if not wait? [
     if timer > 3[
       if not any? fruits and not fruit-placed?[
@@ -318,7 +331,9 @@ to move
     ]
   ]
 
-  ; if the level is finished then wait until the next round starts
+  ; This is always run first technically. Makes sure that
+  ; the program waits two full seconds before beginning rounds.
+  ; That way the player isn't immediately thrown in.
   if (timer >= 2) and wait?[
    set wait? false
     set level-done? false
@@ -326,6 +341,9 @@ to move
   ]
 end
 
+; The general movement of every ghost.
+; They'll randomly choose whether to turn or continue forward.
+; They'll never move backwards.
 
 to scatter
   force-center
@@ -368,6 +386,7 @@ to enemy-movement
     ][
       ; Otherwise slowly frees the ghosts until they've all started roaming
       ; but they won't leave if they're frightened.
+      ; Also stops ghosts in the process of leaving the prison since they'd be safe there.
       if not frightened? [
         ; Each ghost has a time given to them to wait until before they can roam (time-before-roam).
         ; Went that time has passed, they start roaming.
@@ -398,6 +417,11 @@ to enemy-movement
     ]
   ]
 end
+
+
+
+; Checks how long ghosts have been in frightened state since
+; the last eaten power pellet.
 
 to check-frightened
   ; Waits for a ghost to be in the "frightened" state for a max of 8 seconds
@@ -448,7 +472,7 @@ to roam
 end
 
 
-;procedure for making eaten ghosts glide back to their prison
+;procedure for making eaten ghosts glide back to their starting position in the prison
 to restart
   face patch 0 3
   set speed enemy-speed
@@ -463,16 +487,17 @@ to restart
 end
 
 
-; determines what agents should do when colliding into each other (not walls)
+; determines what agents should do when colliding into each other
+
 to collisions
   ; Anytime the score is increased, the player is asked to show it.
 
-  ; If the player is close enough, the pellet gets eaten and gives points.
+  ;;;Pellet interactions
   ask pellets [
    if distance player <= 1 [
       ifelse size = 2 [
 
-        ; If the eaten pellet is a big one, also enable frightened mode
+        ; If a power pellet is eaten, more points and enable frightened mode
         set score (score + 50)
         ask ghosts with [shape != "eaten"] [frightened-mode]
       ][
@@ -482,8 +507,10 @@ to collisions
     ]
   ]
 
+  ;;;Fruit interactions
   ask fruits[
     if distance player <= 1[
+      ;score given depends on the fruit
       if shape = "banana" [set score score + 3000]
       if shape = "strawberry" [set score score + 1000]
       if shape = "apple" [set score score + 500]
@@ -491,15 +518,18 @@ to collisions
     ]
   ]
 
+  ;;;Ghost interactions
   ask ghosts [
-   ifelse frightened? = false[
-     if distance player < 1 [
-       set kill-player? true
+    ;Ghosts not in frightened mode can kill the player
+    ifelse frightened? = false[
+      if distance player < 1 [
+        set kill-player? true
       ]
     ][
+      ;Ghosts not in frightened mode can be eaten and reset
       if (distance player < 1.25) and (shape != "eaten") [
         ; There's a score multiplier that increases with each
-        ; eaten ghost within the timeframe of frightened mode
+        ; eaten consecutive ghost eaten, maxing at 1600.
         set score (score + multiplier)
         if multiplier < 1600[
           set multiplier (multiplier * 2)
@@ -511,14 +541,17 @@ to collisions
   ]
 end
 
-; makes ghost become disembodied
+; makes ghost become harmless eyes
 to get-eaten
-  set time-eaten timer
   set shape "eaten"
 
 end
 
 
+; Is called when the player completes a level.
+; Resets all variables and agent positions
+;    ---It's also called when a player dies because
+;       we realised it needs the same variable and agent resets.
 to next-level
   set fruit-placed? false
   set multiplier 200
@@ -568,6 +601,7 @@ to kill-player
   set kill-player? false
 
   ifelse lives >= 0 [
+    ; calls next-level because it requires the same variable and agent resets
     next-level
   ][
     ask patch 3 -6 [ set plabel-color red set plabel "GAME OVER"]
@@ -609,13 +643,16 @@ to chase
 
 end
 
-
+; Called when the player eats a power pellet.
+; Sets all currently roaming ghosts to their frightened state
 to frightened-mode
   set frightened-timer timer
   set speed (speed * 0.5)
   if not any? ghosts with [shape = "frightened"] [
    set multiplier 200
   ]
+  ; If a ghost has been eaten (shape is not just the pair of eyes),
+  ; it cannot enter frightened mode again until it resets itself in the 'prison'.
   ask ghosts with [shape != "eaten"] [
     set shape "frightened"
     set frightened? true
@@ -626,6 +663,8 @@ end
 
 
 ; Next 4 funtions change the direction the agent will turn at the next intersection
+
+; Agent will turn up, turning off any other turn request.
 to turn-up
   set want-up? true
   set want-down? false
@@ -633,6 +672,7 @@ to turn-up
   set want-right? false
 end
 
+; Agent will turn right, turning off any other turn request.
 to turn-right
   set want-up? false
   set want-down? false
@@ -640,6 +680,7 @@ to turn-right
   set want-right? true
 end
 
+; Agent will turn down, turning off any other turn request.
 to turn-down
   set want-up? false
   set want-down? true
@@ -647,6 +688,7 @@ to turn-down
   set want-right? false
 end
 
+; Agent will turn left, turning off any other turn request.
 to turn-left
   set want-up? false
   set want-down? false
@@ -733,7 +775,7 @@ to move-player
 
 end
 
-; Code places pellets in blocked out areas. This deletes pellets you can't get.
+; Code places pellets in areas the player can't reach. This deletes those pellets.
 to kill-extra-pellets
   ask turtles with [ (ycor = 9)  and (xcor < -19) ] [ die ]
   ask turtles with [ (ycor = 9)  and (xcor >  19) ] [ die ]
@@ -1341,7 +1383,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.2
+NetLogo 6.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
