@@ -7,6 +7,9 @@ globals[
   score ; the game score (shown at top left corner of maze
   score-patch ; the patch that contains a label with the game score
   multiplier ; the multiplier for consecutive ghosts eaten during a given "power up" duration
+  lives
+  kill-player?
+  score
   max-speed
   frame
   time-frame
@@ -29,6 +32,7 @@ patches-own [
   player-wall? ; Player can't enter small box in the center. Only the ghosts can.
   intersection? ;patches that are in the middle of a 4-way or 3-way intersection of the maze
 ]
+
 
 breed [ pacmans pacman ] ; the agent the player plays as
 breed [ ghosts ghost ] ; the colorful autonomous ghosts
@@ -56,8 +60,12 @@ to setup
   set score-patch patch -12 30
   ask score-patch [set plabel "SCORE: 0000000"]
   set player-speed 0.22
-  set enemy-speed player-speed + 0.005 ; set ghosts to be faster than player by a minute amount
+  set enemy-speed player-speed + 0.05 ; set ghosts to be faster than player by a minute amount
   set wait? true ; allow player to get ready at the start of the game, so wait
+
+  set kill-player? false
+  set lives 2
+ 
   set level-done? true
   set score 0 ; reset score
   set multiplier 200
@@ -65,6 +73,7 @@ to setup
   set roam-timer 0
   set time-before-roam 10
   setup-pellets
+
   create-pacmans 1 [
     set size 3
     setxy 0 -15 ;default starting position
@@ -220,6 +229,11 @@ end
 
 to move
   ask score-patch [set plabel word "SCORE: " score] ;update the score constantly
+  if lives < 0 [
+    ask turtles [ die ]
+    show score
+   stop
+  ]
   if not wait? [
     set time-frame round (timer * framerate) ; count 1 frame every 1/60th of a second
     if frame < time-frame + 1[ ; this is run one frame after another
@@ -248,30 +262,32 @@ to move
           ]
         ]
       ]
-      ; Ghosts that are eaten only stay in the "eaten" state for a max of 5 seconds
-      ; before becoming harmful again.
+
+      ; Ghosts that are eaten move to their box and become active again
       ask ghosts with [shape = "eaten"] [
-        if timer - time-eaten > 5 [
-          set frightened? false
-          set shape "ghost"
-          set speed enemy-speed
-        ]
+        restart
       ]
       enemy-movement
       set frame frame + 1
     ]
     collisions
     ; Checks if the player has beaten the level (collected all pellets)
-    if not any? pellets [
+    ifelse not any? pellets [
       next-level
+      setup-pellets
+    ][
+      if kill-player? [
+       kill-player
+      ]
     ]
   ]
   ; if the level is finished then wait until the next round starts
-  if timer > 3 and level-done? [
+  if (timer >= 2) and wait? [
    set wait? false
     set level-done? false
     reset-timer
   ]
+
 end
 
 
@@ -305,7 +321,7 @@ end
 
 
 to enemy-movement
-  ask ghosts [
+  ask ghosts with [shape != "eaten"] [
     ifelse not boxed? [
       ; normal movement
       scatter
@@ -319,22 +335,27 @@ to enemy-movement
         ; Each ghost has a time given to them to wait until before they can roam (time-before-roam).
         ; Went that time has passed, they start roaming.
         ; It's a variable because the times will change as the player progresses through levels.
-        if timer - roam-timer >= time-before-roam [
+        ; The "self" check makes sure a ghost can't make another ghost move when they shouldn't
+        if (timer - roam-timer >= time-before-roam) and (self = clyde) [
           if [boxed?] of clyde = true[
             ask clyde [set heading 0 roam ]
           ]
         ]
 
-        if (timer - roam-timer) >= (time-before-roam * 2 ) [
+        if ((timer - roam-timer) >= (time-before-roam * 2 )) and (self = inky) [
           if [boxed?] of inky = true[
             ask inky [ set heading 270 roam if xcor < 0 [ move-to patch 0 3]]
           ]
         ]
 
-        if (timer - roam-timer) >= (time-before-roam * 3 ) [
+        if ((timer - roam-timer) >= (time-before-roam * 3 )) and (self = blinky) [
           if [boxed?] of blinky = true[
             ask blinky [ set heading 90 roam if xcor > 0 [ move-to patch 0 3]]
           ]
+        ]
+
+        if (self = pinky) [
+          ask pinky [roam]
         ]
       ]
     ]
@@ -362,6 +383,19 @@ to roam
   ]
 end
 
+to restart
+  face patch 0 3
+  set speed enemy-speed
+  fd speed
+  if (pxcor = 0 and pycor = 3) [
+    setxy 0 3
+    set heading 0
+    set boxed? true
+    set frightened? false
+    set shape "ghost"
+    ;set speed enemy-speed
+  ]
+end
 
 to collisions
   ; Anytime the score is increased, the player is asked to show it.
@@ -385,7 +419,7 @@ to collisions
   ask ghosts [
    ifelse frightened? = false[
      if distance player < 1 [
-       ;kill-player
+       set kill-player? true
       ]
     ][
       if (distance player < 1.25) and (shape != "eaten") [
@@ -424,7 +458,13 @@ to next-level
     set time-before-roam (time-before-roam * 0.8)
   ]
 
-  ask player [ setxy 0 -15 ]
+  ask player [
+    setxy 0 -15
+    set heading 0
+    set size 3
+    set color yellow
+    set hidden? false
+  ]
   ask pinky  [ setxy 0 9 set frightened? false set shape "ghost" set heading 0 ]
   ask blinky [ setxy -3 3 set frightened? false set boxed? true set shape "ghost" set heading 0 ]
   ask inky   [ setxy 3 3 set frightened? false set boxed? true set shape "ghost" set heading 0 ]
@@ -435,12 +475,27 @@ to next-level
   reset-timer
   set frame 0
   set time-frame 0
-  setup-pellets
+  set framerate 60
 end
 
 
 to kill-player
-  ask player [ die ]
+   repeat 5 [
+   ask player [
+      set size (size + 0.1)
+      set color (color + 1)
+
+      wait 0.1
+    ]
+  ]
+  set lives (lives - 1)
+  set kill-player? false
+
+  ifelse lives >= 0 [
+    next-level
+  ][
+   show "Game Over"
+  ]
 end
 
 
@@ -648,9 +703,9 @@ ticks
 30.0
 
 BUTTON
-16
+17
 44
-79
+80
 77
 NIL
 setup
@@ -1144,7 +1199,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.2
+NetLogo 6.0.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
