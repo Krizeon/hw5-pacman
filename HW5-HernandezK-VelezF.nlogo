@@ -35,7 +35,8 @@ breed [ ghosts ghost ]
 breed [ pellets pellet ]
 
 turtles-own [
-  speed
+  on-intersection?
+  pellet?
   want-up?
   want-down?
   want-left?
@@ -58,9 +59,10 @@ to setup
     setxy 0 -15
     set heading 0
     set color yellow
-    set speed 0.0001
+    set speed 0.25
     set player self
     set shape "pacman"
+    set on-intersection? false
     turn-setup
   ]
 
@@ -83,6 +85,8 @@ to setup
     set heading 0
     set shape "ghost"
     set pinky self
+    set speed 0.4
+    set on-intersection? false
     turn-setup
     set boxed? false
     set frightened? false
@@ -116,13 +120,12 @@ to setup
   reset-timer
   set frame 0
   set time-frame 0
-  set framerate 20
+  set framerate 60
   setup-pellets
 
 end
 
 to setup-pellets
-
   ; room for 196 total pellets
 
   ; For a place a pellet can be placed at:
@@ -165,15 +168,18 @@ to setup-patches
     ifelse pcolor = 104.7 [
       set player-wall? false
       set wall? true
+      set intersection? false
     ][
       ifelse pcolor = 17.5[
         set player-wall? true
       ][
         set player-wall? false
         set wall? false
+        set intersection? false
       ]
     ]
   ]
+  ; determine all the intersections of the maze
   ask patches with [wall? = false  and (pxcor mod 3 = 0) and (pycor mod 3 = 0)][
     if count (patches in-radius 3 with [wall? = true]) = 4 or count (patches in-radius 2 with [wall? = true]) = 1 [
       ;set pcolor green       ;Used to see the main intersections that the ghosts randomly choose paths from
@@ -198,7 +204,7 @@ to move
       ;show frame
       ask player [
         if want-up? [
-          ask patch ([xcor] of player) (([ycor] of player) + 1) [
+          ask patch ([pxcor] of player) (([pycor] of player) + 1) [
             ifelse any? neighbors with [wall? = true] [
             ] [
               ask player [set heading 0]
@@ -206,7 +212,7 @@ to move
           ]
         ]
         if want-down? [
-          ask patch ([xcor] of player) (([ycor] of player) - 1) [
+          ask patch ([pxcor] of player) (([pycor] of player) - 1) [
             ifelse any? neighbors with [wall? = true] [
             ] [
               ask player [set heading 180]
@@ -214,7 +220,7 @@ to move
           ]
         ]
         if want-right? [
-          ask patch (([xcor] of player) + 1) ([ycor] of player) [
+          ask patch (([pxcor] of player) + 1) ([pycor] of player) [
             ifelse any? neighbors with [wall? = true] [
             ] [
               ask player [set heading 90]
@@ -222,7 +228,7 @@ to move
           ]
         ]
         if want-left? [
-          ask patch (([xcor] of player) - 1) ([ycor] of player) [
+          ask patch (([pxcor] of player) - 1) ([pycor] of player) [
             ifelse any? neighbors with [wall? = true] [
             ] [
               ask player [set heading 270]
@@ -230,11 +236,10 @@ to move
           ]
         ]
         if [wall?] of patch-ahead 2 = false  and [player-wall?] of patch-ahead 3 = false[
-          fd .75
+          fd speed
           animate-pacman
         ]
       ]
-
       ; Waits for a ghost to be in the "frightened" state for a max of 8 seconds
       ; before becoming harmful again.
       ifelse timer - frightened-timer > 8 [
@@ -302,7 +307,10 @@ to move
       set frame frame + 1
     ]
     collisions
-
+    scatter
+    set frame frame + 1
+    collisions
+  ]
     ; Checks if the player has beaten the level (collected all pellets)
     if not any? pellets [
       next-level
@@ -317,6 +325,33 @@ to move
 end
 
 
+to scatter
+    force-center
+    if [intersection?] of patch-here = true and on-intersection? = false[
+      move-to one-of patches with [intersection? = true and distance myself < 1]
+      ;show "yoo"
+      set on-intersection? true
+    ]
+    ifelse [wall?] of patch-ahead 2 = false[
+      fd speed
+      if [intersection?] of patches in-radius 1 = false or [intersection?] of patch-here = false[
+        set on-intersection? false
+        ;show "on intersection!"
+      ]
+    ][
+      if [wall?] of patch-right-and-ahead 90 2 = false[
+        rt 90
+      ]
+      if [wall?] of patch-left-and-ahead 90 2 = false[
+        lt 90
+      ]
+
+      set heading round heading
+    ]
+end
+
+
+
 to roam
   ; First checks if the ghost is in the middle of their prison so they can leave it.
   ; If not, moves them towards it.
@@ -328,10 +363,11 @@ to roam
       set boxed? false
     ][
       set heading 0
-      fd 0.75
+      fd speed
+
     ]
   ][
-   fd 0.75
+   fd speed
   ]
 end
 
@@ -479,6 +515,18 @@ to turn-setup
 end
 
 
+; this method makes sure that the player and any moving agent is centered on each
+; patch for ease of movement
+to force-center
+  if heading = 0 or heading = 180[
+    set xcor round xcor
+  ]
+    if  heading = 270 or heading = 90[
+    set ycor round ycor
+  ]
+end
+
+
 ;animate Pac-man so that his mouth opens every other frame
 to animate-pacman
   ask player[
@@ -503,6 +551,7 @@ to set-big-pellets
   ask turtles with [ (ycor = -27)  and (xcor =  24) ] [ set size 2 ]
   ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 ]
 end
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
@@ -551,9 +600,9 @@ NIL
 BUTTON
 16
 106
-79
+97
 139
-NIL
+move
 move
 T
 1
@@ -633,42 +682,24 @@ NIL
 NIL
 1
 
+SLIDER
+30
+316
+202
+349
+speed
+speed
+0
+1
+0.4
+0.05
+1
+NIL
+HORIZONTAL
+
 @#$#@#$#@
-## WHAT IS IT?
-
-(a general understanding of what the model is trying to show or explain)
-
-## HOW IT WORKS
-
-(what rules the agents use to create the overall behavior of the model)
-
-## HOW TO USE IT
-
-(how to use the model, including a description of each of the items in the Interface tab)
-
-## THINGS TO NOTICE
-
-(suggested things for the user to notice while running the model)
-
-## THINGS TO TRY
-
-(suggested things for the user to try to do (move sliders, switches, etc.) with the model)
-
-## EXTENDING THE MODEL
-
-(suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
-
-## NETLOGO FEATURES
-
-(interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
-
-## RELATED MODELS
-
-(models in the NetLogo Models Library and elsewhere which are of related interest)
-
-## CREDITS AND REFERENCES
-
-(a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)
+## framerate
+60fps
 @#$#@#$#@
 default
 true
