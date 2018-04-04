@@ -3,78 +3,86 @@
 ; Pac-Man
 
 globals[
-  start-patch
-  player
+  player ; the player, whom controls pacman
+  score ; the game score (shown at top left corner of maze
+  score-patch ; the patch that contains a label with the game score
+  multiplier ; the multiplier for consecutive ghosts eaten during a given "power up" duration
   lives
   kill-player?
   score
-  multiplier
   max-speed
   frame
   time-frame
   framerate ;determines the framerate of the game (default 30 fps)
-  ;ghost names
   inky   ;blue ghost
   blinky ;red ghost
   pinky  ;pink ghost
   clyde  ;orange ghost
-  frightened-timer
-  roam-timer
-  time-before-roam
-  wait?
-  level-done?
-  player-speed
-  enemy-speed
+  frightened-timer ; the amount of time that ghosts should be "frightened" for while pacman is powered up
+  roam-timer ; the amount of time it takes to escape the ghost prison
+  time-before-roam ;the amount of time to wait before the next ghost should leave the ghost prison
+  wait? ; if true stop the game (used during transitions to the next level
+  level-done? ; if true, move to the next level
+  player-speed ; the player's speed (does not change after each level)
+  enemy-speed ; the ghost's speed (increments slightly every level)
 ]
 
 patches-own [
-; Agents can't walk through walls -- patches with wall? = true
-  wall?
-; Player can't enter small box in the center. Only the ghosts can.
-  player-wall?
-  intersection?
+  wall? ; Agents can't walk through walls -- patches with wall? = true
+  player-wall? ; Player can't enter small box in the center. Only the ghosts can.
+  intersection? ;patches that are in the middle of a 4-way or 3-way intersection of the maze
 ]
 
 
-breed [ ghosts ghost ]
-breed [ pellets pellet ]
-breed [ pacmans pacman ]
+breed [ pacmans pacman ] ; the agent the player plays as
+breed [ ghosts ghost ] ; the colorful autonomous ghosts
+breed [ pellets pellet ] ; the small white pelets scattered across the maze
 
 turtles-own [
-  on-intersection?
+  on-intersection? ; true if turtle is on a patch with intersection? = true
   pellet?
-  want-up?
-  want-down?
-  want-left?
-  want-right?
-  speed
+  want-up? ;player wants to turn up at next possible turn
+  want-down?  ;player wants to turn down at next possible turn
+  want-left?  ;player wants to turn left at next possible turn
+  want-right?  ;player wants to turn right at next possible turn
+  speed ;turtle's speed
 ]
 
-ghosts-own [ boxed? frightened? time-eaten sight-range]
+ghosts-own [
+  boxed? ; true if ghost is within the ghost prison, false otherwise
+  frightened? ;true if ghost is in frightened mode, false otherwise
+  time-eaten
+  sight-range ; the range of sight in patches, varies by each ghost
+]
 
 to setup
   ca
+  set score-patch patch -12 30
+  ask score-patch [set plabel "SCORE: 0000000"]
+  set player-speed 0.22
+  set enemy-speed player-speed + 0.05 ; set ghosts to be faster than player by a minute amount
+  set wait? true ; allow player to get ready at the start of the game, so wait
+
   set kill-player? false
   set lives 2
-  set player-speed 0.22
-  set enemy-speed player-speed + 0.05
-  set wait? true
+ 
   set level-done? true
-  set score 0
+  set score 0 ; reset score
   set multiplier 200
   setup-patches
   set roam-timer 0
   set time-before-roam 10
+  setup-pellets
 
   create-pacmans 1 [
     set size 3
-    setxy 0 -15
+    setxy 0 -15 ;default starting position
     set heading 0
     set color yellow
     set player self
     set shape "pacman"
     set on-intersection? false
-    turn-setup
+    turn-setup ;do not have player start with a bias to turn to one side until player moves with keys
     set speed player-speed
   ]
 
@@ -89,6 +97,7 @@ to setup
     set boxed? true
     set frightened? false
     set speed enemy-speed
+    set sight-range 18 ;longest range of sight
   ]
 
   create-ghosts 1 [
@@ -103,12 +112,13 @@ to setup
     set boxed? false
     set frightened? false
     set speed enemy-speed
+    set sight-range 12
   ]
 
   create-ghosts 1 [
     set size 4
     setxy 3 3
-    set color blue + 1.5
+    set color blue + 1.5 ; we wanted a slightly brighter blue than the default
     set heading 0
     set shape "ghost"
     set inky self
@@ -116,6 +126,7 @@ to setup
     set boxed? true
     set frightened? false
     set speed enemy-speed
+    set sight-range 12
   ]
 
   create-ghosts 1 [
@@ -129,20 +140,22 @@ to setup
     set boxed? true
     set frightened? false
     set speed enemy-speed
+    set sight-range 9 ;shortest range of sight
   ]
 
   reset-ticks
   reset-timer
   set frame 0
   set time-frame 0
-  set framerate 60
-  setup-pellets
+  set framerate 60 ; game runs at 60 frames per second (FPS), so all agents move "at the same time" every frame for consistency
+
 
 end
 
+
+; create all the small pellets scattered across the maze
 to setup-pellets
   ; room for 196 total pellets
-
   ; For a place a pellet can be placed at:
   ;    1) Can't be on a wall
   ;    2) No neighbors that are walls (so it's centered)
@@ -176,7 +189,8 @@ to setup-pellets
 end
 
 
-; The maze is imported from a picture.
+; this method determines which patches are walls and which are intersections, as well as
+; the one-way prison doors. the maze is imported from a picture.
 to setup-patches
   import-pcolors "pacman-maze.png"
   ask patches [
@@ -194,17 +208,18 @@ to setup-patches
       ]
     ]
   ]
-  ; determine all the intersections of the maze
+  ; determine all the intersections of the maze. they MUST be at the exact center of a patch.
   ask patches with [wall? = false  and (pxcor mod 3 = 0) and (pycor mod 3 = 0)][
     if count (patches in-radius 3 with [wall? = true]) = 4 or count (patches in-radius 2 with [wall? = true]) = 1 [
-      set pcolor green       ;Used to see the main intersections that the ghosts randomly choose paths from
+      ;set pcolor green       ; Used to see the main intersections that the ghosts randomly choose paths from
+                              ; uncomment to see which patches are considered intersections!
       set intersection? true
     ]
   ]
 
   ; makes sure that the patches above the pink barrier are viewed as a wall by the player
-  ask patch 0 9 [ set intersection? false set pcolor black]
-  ask patch 0 3 [ set intersection? false set pcolor black]
+  ask patch 0 9 [ set intersection? false set pcolor black] ; our algorithm initially determines this patch as an intersection, so we correct this
+  ask patch 0 3 [ set intersection? false set pcolor black] ; same with this patch
   ask patch -1 7 [ set player-wall? true ]
   ask patch  0 7 [ set player-wall? true ]
   ask patch  1 7 [ set player-wall? true ]
@@ -213,17 +228,15 @@ end
 
 
 to move
-
+  ask score-patch [set plabel word "SCORE: " score] ;update the score constantly
   if lives < 0 [
     ask turtles [ die ]
     show score
    stop
   ]
-
-
   if not wait? [
-    set time-frame round (timer * framerate)
-    if frame < time-frame + 1[
+    set time-frame round (timer * framerate) ; count 1 frame every 1/60th of a second
+    if frame < time-frame + 1[ ; this is run one frame after another
       ;show frame
       move-player
       ; Waits for a ghost to be in the "frightened" state for a max of 8 seconds
@@ -254,9 +267,7 @@ to move
       ask ghosts with [shape = "eaten"] [
         restart
       ]
-
       enemy-movement
-
       set frame frame + 1
     ]
     collisions
@@ -270,8 +281,7 @@ to move
       ]
     ]
   ]
-
-
+  ; if the level is finished then wait until the next round starts
   if (timer >= 2) and wait? [
    set wait? false
     set level-done? false
@@ -283,7 +293,6 @@ end
 
 to scatter
   force-center
-
   ;handle when and which direction to turn at a marked intersection
   ;when at an intersection, go either forward, left, or right
   if [intersection?] of patch-here = true and on-intersection? = false[
@@ -316,6 +325,9 @@ to enemy-movement
     ifelse not boxed? [
       ; normal movement
       scatter
+      let target pacmans in-cone sight-range 150
+      if any? target[ chase ]
+      ;ask patches in-cone sight-range 45 [if pacmans-on myself = true [chase]]
     ][
       ; Otherwise slowly frees the ghosts until they've all started roaming
       ; but they won't leave if they're frightened.
@@ -351,6 +363,7 @@ to enemy-movement
 end
 
 
+; procedure for leaving the ghost prison
 to roam
   ; First checks if the ghost is in the middle of their prison so they can leave it.
   ; If not, moves them towards it.
@@ -403,7 +416,6 @@ to collisions
     ]
   ]
 
-
   ask ghosts [
    ifelse frightened? = false[
      if distance player < 1 [
@@ -425,11 +437,13 @@ to collisions
   ]
 end
 
+
 to get-eaten
   set time-eaten timer
   set shape "eaten"
 
 end
+
 
 to next-level
 
@@ -437,6 +451,8 @@ to next-level
   set roam-timer 0
   set level-done? true
   set wait? true
+  set enemy-speed enemy-speed + 0.01
+  ask ghosts [set speed enemy-speed]
 
   if time-before-roam > 3 [
     set time-before-roam (time-before-roam * 0.8)
@@ -480,6 +496,40 @@ to kill-player
   ][
    show "Game Over"
   ]
+end
+
+
+to chase
+  let temp-distance 0 ;the distance from the ghost's current patch to the player
+  let player-position patch-at [pxcor] of player [pycor] of player ;the patch where the player rests at this moment
+
+  if [intersection?] of patch-here = true and on-intersection? = false[
+    move-to one-of patches with [intersection? = true and distance myself < 1 ]
+    let patches-to-turn-toward (patch-set patch-ahead 2 patch-ahead -2 patch-left-and-ahead 90 2 patch-right-and-ahead 90 2)
+    ask patch-here [set temp-distance distance player]
+
+    if any? patches-to-turn-toward with [wall? = false and distance player < temp-distance][
+      face one-of patches-to-turn-toward with [wall? = false and distance player < temp-distance]
+    ]
+    set on-intersection? true
+  ]
+  ifelse [wall?] of patch-ahead 2 = false[
+    ;fd speed
+    if [intersection?] of patches in-radius 1 = false or [intersection?] of patch-here = false[
+      set on-intersection? false
+    ]
+  ][
+
+    if [wall?] of patch-right-and-ahead 90 2 = false[ ; if ghost reaches a corner where only available turn is right
+      rt 90
+    ]
+    if [wall?] of patch-left-and-ahead 90 2 = false[ ; if ghost reaches a corner where only available turn is left
+      lt 90
+    ]
+
+    set heading round heading
+  ]
+
 end
 
 
@@ -539,14 +589,15 @@ end
 
 
 ; this method makes sure that the player and any moving agent is centered on each
-; patch for ease of movement
+; patch for ease of movement. with this method, the distance that an agent may jump
+; to be at the exact center of a patch is nominal.
 to force-center
-  if heading = 0 or heading = 180[
+  if heading = 0 or heading = 180[ ; turns |-o---| to |--o--| if agents are out of alignment
     set xcor round xcor
   ]
-    if  heading = 270 or heading = 90[
-    set ycor round ycor
-  ]
+    if  heading = 270 or heading = 90[ ; turns  ===  to ===   if agents are out of alignment
+    set ycor round ycor                ;         =       o
+  ]                                    ;        _o_     ===
 end
 
 
@@ -559,9 +610,12 @@ to animate-pacman
 end
 
 
+; player movement is set up so that the user only has to tap in the direction that they want to go in next
+; just once, so the need to hold down a key to change direction is eliminated. Due to this implementation,
+; the player is constantly moving unless they are in front of a wall.
 to move-player
   ask player [
-    force-center
+    force-center ;always stay centered on every patch when moving
     if want-up? [
       ask patch ([pxcor] of player) (([pycor] of player) + 1) [
         ifelse any? neighbors with [wall? = true] [
@@ -594,6 +648,8 @@ to move-player
         ]
       ]
     ]
+
+    ; if no walls are ahead of the player, move and animate
     if [wall?] of patch-ahead 2 = false  and [player-wall?] of patch-ahead 3 = false[
       fd speed
       animate-pacman
@@ -611,12 +667,12 @@ to kill-extra-pellets
   ask turtles with [ (ycor = -3) and (xcor =   0) ] [ die ]
 end
 
-; Sets up the power pellets
+; Sets up the large power pellets on the corners of the maze
 to set-big-pellets
-  ask turtles with [ (ycor =  27)  and (xcor = -24) ] [ set size 2 ]
-  ask turtles with [ (ycor = -27)  and (xcor = -24) ] [ set size 2 ]
-  ask turtles with [ (ycor = -27)  and (xcor =  24) ] [ set size 2 ]
-  ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 ]
+  ask turtles with [ (ycor =  27)  and (xcor = -24) ] [ set size 2 set color yellow ]
+  ask turtles with [ (ycor = -27)  and (xcor = -24) ] [ set size 2 set color yellow ]
+  ask turtles with [ (ycor = -27)  and (xcor =  24) ] [ set size 2 set color yellow ]
+  ask turtles with [ (ycor =  27)  and (xcor =  24) ] [ set size 2 set color yellow ]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -628,7 +684,7 @@ GRAPHICS-WINDOW
 -1
 8.0
 1
-12
+14
 1
 1
 1
