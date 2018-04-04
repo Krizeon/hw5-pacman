@@ -1,6 +1,7 @@
 ; Felix Velez and Kevin Hernandez
-; HW6
-; Pac-Man
+; CSCI 390
+; 4/4/2018
+; HW5 - Pac-Man
 
 globals[
   player ; the player, whom controls pacman
@@ -8,11 +9,10 @@ globals[
   score-patch ; the patch that contains a label with the game score
   lives-patch ; the patch where the interface for lives remaining is displayed
   multiplier ; the multiplier for consecutive ghosts eaten during a given "power up" duration
-  lives
+  lives ; amount of lives the player has
   kill-player?
-  max-speed
-  frame
-  time-frame
+  frame ; current frame
+  time-frame ;the frame after the current frame
   framerate ;determines the framerate of the game (default 30 fps)
   inky   ;blue ghost
   blinky ;red ghost
@@ -53,11 +53,13 @@ turtles-own [
   speed ;turtle's speed
 ]
 
+
 ghosts-own [
   boxed? ; true if ghost is within the ghost prison, false otherwise
   frightened? ;true if ghost is in frightened mode, false otherwise
   sight-range ; the range of sight in patches, varies by each ghost
 ]
+
 
 ; setup the entire game!
 to setup
@@ -175,6 +177,7 @@ to place-fruit
   ]
 end
 
+
 ; Visually displays player's lives at the bottom of the screen
 to setup-lives
   set lives-patch (patch -20 -30)
@@ -266,6 +269,7 @@ to setup-patches
 
 end
 
+
 ; Core of the game.
 ; Each time the player begins a round (whether they die or complete the level)
 ;    the program sets wait? to be true. While it's true, this function will not move the agents
@@ -273,7 +277,6 @@ end
 ; It always first checks how many lives the player has because if the player has no lives,
 ;    then the game is over and it calls 'stop'
 ;
-
 to move
   ; Before the round starts, displays "READY?"
   ifelse wait? [
@@ -283,7 +286,6 @@ to move
   ]
 
   ask score-patch [set plabel word "SCORE: " score] ;update the score constantly
-
 
   ; Runs this if statement only when the player has no lives left.
   ; This stops the game completely.
@@ -303,7 +305,8 @@ to move
       ]
     ]
     set time-frame round (timer * framerate) ; count 1 frame every 1/60th of a second
-    if frame < time-frame + 1[ ; this is run one frame after another
+    if frame < time-frame + 1[ ; this is run one frame after another, basically means
+                               ; check if this is the next frame before performing move procedure.
       move-player
 
       ; Makes sure ghosts don't stay in frightened mode longer than 8 seconds
@@ -541,10 +544,10 @@ to collisions
   ]
 end
 
+
 ; makes ghost become harmless eyes
 to get-eaten
   set shape "eaten"
-
 end
 
 
@@ -554,6 +557,7 @@ end
 ;       we realised it needs the same variable and agent resets.
 to next-level
   set fruit-placed? false
+
   set multiplier 200
   set roam-timer 0
   set level-done? true
@@ -581,7 +585,6 @@ to next-level
   reset-timer
   set frame 0
   set time-frame 0
-  set framerate 60
 end
 
 
@@ -662,7 +665,7 @@ end
 
 
 
-; Next 4 funtions change the direction the agent will turn at the next intersection
+;-------- Next 4 procedures change the direction the agent will turn at the next available turn
 
 ; Agent will turn up, turning off any other turn request.
 to turn-up
@@ -672,6 +675,7 @@ to turn-up
   set want-right? false
 end
 
+
 ; Agent will turn right, turning off any other turn request.
 to turn-right
   set want-up? false
@@ -679,6 +683,7 @@ to turn-right
   set want-left? false
   set want-right? true
 end
+
 
 ; Agent will turn down, turning off any other turn request.
 to turn-down
@@ -688,6 +693,7 @@ to turn-down
   set want-right? false
 end
 
+
 ; Agent will turn left, turning off any other turn request.
 to turn-left
   set want-up? false
@@ -695,6 +701,7 @@ to turn-left
   set want-left? true
   set want-right? false
 end
+
 
 ; No turn request given at the start. Player chooses.
 to turn-setup
@@ -775,6 +782,7 @@ to move-player
 
 end
 
+
 ; Code places pellets in areas the player can't reach. This deletes those pellets.
 to kill-extra-pellets
   ask turtles with [ (ycor = 9)  and (xcor < -19) ] [ die ]
@@ -783,6 +791,7 @@ to kill-extra-pellets
   ask turtles with [ (ycor = -3) and (xcor >  19) ] [ die ]
   ask turtles with [ (ycor = -3) and (xcor =   0) ] [ die ]
 end
+
 
 ; Sets up the large power pellets on the corners of the maze
 to set-big-pellets
@@ -952,7 +961,7 @@ The agents include Pac-Man (the player) and the 4 ghosts (autonomous).
 
 One by one a new ghost is programmed to leave the prison to pursue the player. Generally, they will randomly choose directions (except backwards). But if the player is within their line of sight, they will try to track down the player by following the player's movements.
 
-Each ghost is slightly different in speed and vision. As the player progresses to new levels, the ghosts slowly get more agressive, increasing their speed and shortening the time they stay in their prison.
+Each ghost is slightly different in speed and vision. For example, Blinky (red ghost) has the largest range of sight, while Clyde (orange ghost) has the smallest. As the player progresses to new levels, the ghosts slowly get more agressive, increasing their speed and shortening the time they stay in their prison.
 
 ## CREDITS
 
@@ -1383,7 +1392,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.1
+NetLogo 6.0.2
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
